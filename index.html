@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1F4E79">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cobranza">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='30' fill='%231F4E79'/><text x='90' y='125' text-anchor='middle' font-size='110'>💼</text></svg>">
+<title>FEBECA — App de Cobranza</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+/* ── Reset & Base ─────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#1F4E79;--blue:#2E75B6;--lblue:#D6E4F0;--sky:#EBF3FB;
+  --green:#4CAF50;--yellow:#FFC107;--orange:#FF9800;--red:#E53935;
+  --darkred:#C00000;--purple:#7030A0;
+  --white:#fff;--gray:#f4f6f9;--border:#dde3ec;--text:#1a1a2e;--muted:#6b7280;
+  --sidebar:220px;--radius:10px;--shadow:0 2px 12px rgba(0,0,0,.08);
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--text);display:flex;min-height:100vh}
+
+/* ── Sidebar ──────────────────────────────────────────── */
+#sidebar{width:var(--sidebar);background:var(--navy);color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:.3s}
+#sidebar .logo{padding:22px 18px 16px;border-bottom:1px solid rgba(255,255,255,.15)}
+#sidebar .logo h2{font-size:16px;font-weight:700;letter-spacing:.5px}
+#sidebar .logo p{font-size:11px;opacity:.6;margin-top:3px}
+#sidebar nav{flex:1;padding:12px 0;overflow-y:auto}
+#sidebar nav a{display:flex;align-items:center;gap:10px;padding:11px 18px;color:rgba(255,255,255,.75);text-decoration:none;font-size:13px;transition:.2s;cursor:pointer;border-left:3px solid transparent}
+#sidebar nav a:hover,#sidebar nav a.active{background:rgba(255,255,255,.12);color:#fff;border-left-color:#fff}
+#sidebar nav a .icon{font-size:17px;width:22px;text-align:center}
+#sidebar .sidebar-footer{padding:14px 18px;border-top:1px solid rgba(255,255,255,.15);font-size:11px;opacity:.5}
+
+/* ── Main ─────────────────────────────────────────────── */
+#main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.topbar h1{font-size:18px;font-weight:700;color:var(--navy)}
+.topbar .date-badge{background:var(--lblue);color:var(--navy);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600}
+.content{padding:24px 28px;flex:1}
+
+/* ── Views ────────────────────────────────────────────── */
+.view{display:none}.view.active{display:block}
+
+/* ── KPI Cards ────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:16px;margin-bottom:24px}
+.kpi-card{background:#fff;border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border-left:4px solid var(--blue);position:relative;overflow:hidden}
+.kpi-card .kpi-icon{position:absolute;right:14px;top:14px;font-size:28px;opacity:.15}
+.kpi-card .kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.kpi-card .kpi-value{font-size:30px;font-weight:800;margin:6px 0 2px;color:var(--navy)}
+.kpi-card .kpi-sub{font-size:11px;color:var(--muted)}
+.kpi-card.green{border-left-color:var(--green)}.kpi-card.green .kpi-value{color:var(--green)}
+.kpi-card.yellow{border-left-color:var(--yellow)}.kpi-card.yellow .kpi-value{color:#b8860b}
+.kpi-card.orange{border-left-color:var(--orange)}.kpi-card.orange .kpi-value{color:var(--orange)}
+.kpi-card.red{border-left-color:var(--red)}.kpi-card.red .kpi-value{color:var(--red)}
+.kpi-card.purple{border-left-color:var(--purple)}.kpi-card.purple .kpi-value{color:var(--purple)}
+.kpi-card.darkred{border-left-color:var(--darkred)}.kpi-card.darkred .kpi-value{color:var(--darkred)}
+
+/* ── Section Header ───────────────────────────────────── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-header h2{font-size:15px;font-weight:700;color:var(--navy)}
+.section-header .actions{display:flex;gap:8px}
+
+/* ── Buttons ──────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.2s;text-decoration:none}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--navy)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#388e3c}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#b71c1c}
+.btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--text)}.btn-ghost:hover{background:var(--lblue)}
+.btn-wa{background:#25D366;color:#fff}.btn-wa:hover{background:#128C7E}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-icon{padding:6px 8px;background:transparent;border:none;cursor:pointer;border-radius:6px;font-size:15px;transition:.2s}
+.btn-icon:hover{background:var(--sky)}
+
+/* ── Table ────────────────────────────────────────────── */
+.table-wrap{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{background:var(--navy);color:#fff}
+thead th{padding:11px 14px;text-align:left;font-weight:600;white-space:nowrap;font-size:12px}
+tbody tr{border-bottom:1px solid var(--border);transition:.15s}
+tbody tr:hover{background:var(--sky)}
+tbody td{padding:10px 14px;vertical-align:middle}
+.no-data{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+/* ── Badge / Chips ────────────────────────────────────── */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.badge-green{background:#e8f5e9;color:#2e7d32}
+.badge-yellow{background:#fff8e1;color:#f57f17}
+.badge-orange{background:#fff3e0;color:#e65100}
+.badge-red{background:#ffebee;color:#b71c1c}
+.badge-darkred{background:#fce4ec;color:#880e4f}
+.badge-purple{background:#f3e5f5;color:#6a1b9a}
+.badge-gray{background:#f5f5f5;color:#616161}
+.badge-blue{background:#e3f2fd;color:#1565c0}
+
+/* ── Forms / Modals ───────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:var(--radius);padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h3{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select,.form-group textarea{border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;outline:none;transition:.2s;font-family:inherit;background:#fff}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(46,117,182,.1)}
+.form-group textarea{resize:vertical;min-height:80px}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+
+/* ── Search / Filter bar ──────────────────────────────── */
+.filter-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.filter-bar input,.filter-bar select{border:1.5px solid var(--border);border-radius:7px;padding:8px 12px;font-size:13px;outline:none;background:#fff}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--blue)}
+.filter-bar input{flex:1;min-width:180px}
+
+/* ── Msg cards (Mensajes del día) ─────────────────────── */
+.msg-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px;border-left:5px solid var(--blue);display:flex;flex-direction:column;gap:10px}
+.msg-card.mora{border-left-color:var(--darkred)}
+.msg-card .msg-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.msg-card .msg-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.msg-card .msg-text{background:var(--gray);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.6;color:#333;position:relative}
+.msg-card .msg-actions{display:flex;gap:8px;flex-wrap:wrap}
+.copy-btn{font-size:11px}
+
+/* ── Settings templates ───────────────────────────────── */
+.template-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px;border-left:5px solid var(--purple)}
+.template-card.mora-tpl{border-left-color:var(--darkred)}
+.template-card h4{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px}
+.template-card textarea{width:100%;border:1.5px solid var(--border);border-radius:7px;padding:10px;font-size:12px;font-family:inherit;resize:vertical;min-height:72px;line-height:1.5}
+.template-card textarea:focus{border-color:var(--blue);outline:none}
+.template-card .tpl-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.tpl-vars{font-size:11px;color:var(--muted)}
+
+/* ── Tabs ─────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:#fff;padding:6px;border-radius:var(--radius);box-shadow:var(--shadow);width:fit-content}
+.tab{padding:8px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:.2s}
+.tab.active{background:var(--navy);color:#fff}
+
+/* ── Empty State ──────────────────────────────────────── */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .empty-icon{font-size:48px;margin-bottom:12px;display:block}
+.empty-state h3{font-size:16px;margin-bottom:6px;color:var(--navy)}
+.empty-state p{font-size:13px}
+
+/* ── Toast ────────────────────────────────────────────── */
+#toast{position:fixed;bottom:24px;right:24px;background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+#toast.show{display:flex}
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+
+/* ── Responsive ───────────────────────────────────────── */
+@media(max-width:768px){
+  /* Sidebar → barra inferior */
+  #sidebar{
+    position:fixed;bottom:0;left:0;top:auto;width:100%;height:60px;
+    flex-direction:row;z-index:200;border-top:1px solid rgba(255,255,255,.15);
+    box-shadow:0 -2px 12px rgba(0,0,0,.15)
+  }
+  #sidebar .logo{display:none}
+  #sidebar .sidebar-footer{display:none}
+  #sidebar nav{display:flex;flex-direction:row;justify-content:space-around;align-items:center;padding:0;width:100%;overflow-x:auto}
+  #sidebar nav a{flex-direction:column;gap:2px;padding:8px 4px;border-left:none!important;border-top:3px solid transparent;font-size:10px;min-width:0;flex:1;text-align:center;justify-content:center}
+  #sidebar nav a.active{border-top-color:#fff;border-left-color:transparent!important}
+  #sidebar nav a .icon{font-size:20px;width:auto}
+  #sidebar nav a span:not(.icon){font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+
+  /* Main */
+  #main{margin-left:0;margin-bottom:60px}
+  .topbar{padding:10px 16px}
+  .topbar h1{font-size:15px}
+  .topbar .date-badge{font-size:10px;padding:4px 10px}
+  .content{padding:12px}
+
+  /* KPIs */
+  .kpi-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px}
+  .kpi-card{padding:12px 14px}
+  .kpi-card .kpi-value{font-size:22px}
+  .kpi-card .kpi-label{font-size:10px}
+  .kpi-card .kpi-sub{font-size:10px}
+
+  /* Section headers */
+  .section-header{flex-direction:column;align-items:flex-start!important;gap:10px}
+  .section-header .actions{width:100%;display:flex;flex-wrap:wrap;gap:6px}
+  .section-header .actions .btn{flex:1;min-width:0;justify-content:center;font-size:11px;padding:7px 8px}
+  .section-header h2{font-size:14px}
+
+  /* Filter bars */
+  .filter-bar{flex-direction:column;gap:8px}
+  .filter-bar input,.filter-bar select{width:100%;min-width:0}
+
+  /* Tables scroll */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:600px}
+  thead th{padding:8px 10px;font-size:11px}
+  tbody td{padding:8px 10px;font-size:12px}
+
+  /* Modals full screen */
+  .modal{width:100%!important;max-width:100vw!important;max-height:100vh!important;border-radius:0!important;padding:20px 16px}
+  .modal-overlay.open{align-items:flex-end}
+  .form-grid{grid-template-columns:1fr!important}
+  .modal h3{font-size:15px}
+
+  /* Dashboard grid */
+  #view-dashboard>div[style]{grid-template-columns:1fr!important}
+
+  /* Buttons */
+  .btn{padding:10px 14px;font-size:12px}
+  .btn-sm{padding:6px 10px;font-size:11px}
+
+  /* Msg cards */
+  .msg-card{padding:14px}
+  .msg-card .msg-header{font-size:12px}
+
+  /* Tabs */
+  .tabs{width:100%}
+  .tab{flex:1;text-align:center;padding:10px 8px;font-size:12px}
+
+  /* Datos view */
+  #view-datos>div[style*="grid"]{grid-template-columns:1fr!important}
+  #view-datos ol{font-size:12px;line-height:1.8}
+
+  /* Template cards */
+  .template-card{padding:14px}
+  .template-card h4{font-size:12px}
+  .template-card textarea{font-size:11px}
+
+  /* Badge in headers */
+  .section-header h2 .badge{display:block;margin:4px 0 0;font-size:11px}
+
+  /* Toast */
+  #toast{left:12px;right:12px;bottom:72px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="logo">
+    <h2>💼 FEBECA</h2>
+    <p>Gestión de Cobranza</p>
+  </div>
+  <nav>
+    <a class="active" onclick="showView('dashboard')"><span class="icon">📊</span><span>Dashboard</span></a>
+    <a onclick="showView('clientes')"><span class="icon">👥</span><span>Clientes</span></a>
+    <a onclick="showView('facturas')"><span class="icon">🧾</span><span>Facturas</span></a>
+    <a onclick="showView('mensajes')"><span class="icon">📲</span><span>Mensajes del día</span></a>
+    <a onclick="showView('config')"><span class="icon">⚙️</span><span>Plantillas</span></a>
+    <a onclick="showView('datos')"><span class="icon">💾</span><span>Datos</span></a>
+  </nav>
+  <div class="sidebar-footer">v1.0 · FEBECA 2026</div>
+</nav>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
+<div id="main">
+  <div class="topbar">
+    <h1 id="view-title">Dashboard</h1>
+    <span class="date-badge" id="today-badge"></span>
+  </div>
+  <div class="content">
+
+    <!-- ── DASHBOARD ──────────────────────────────────────────────────────── -->
+    <div class="view active" id="view-dashboard">
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div class="section-header"><h2>📲 Mensajes a enviar HOY</h2></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Cliente</th><th>Factura</th><th>Tipo</th><th></th></tr></thead>
+            <tbody id="dash-msgs"></tbody>
+          </table></div>
+        </div>
+        <div>
+          <div class="section-header"><h2>🔴 Facturas en mora</h2></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Cliente</th><th>Factura</th><th>Días mora</th><th>Monto</th></tr></thead>
+            <tbody id="dash-mora"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CLIENTES ────────────────────────────────────────────────────────── -->
+    <div class="view" id="view-clientes">
+      <div class="section-header">
+        <h2>Directorio de Clientes <span id="contador-clientes" class="badge badge-blue" style="font-size:12px;vertical-align:middle;margin-left:6px"></span></h2>
+        <div class="actions">
+          <input type="file" id="excel-clientes" accept=".xlsx,.xls,.csv" style="display:none" onchange="importClientes(this)">
+          <button class="btn btn-ghost" onclick="descargarPlantillaClientes()">📄 Descargar planilla</button>
+          <button class="btn btn-green" onclick="document.getElementById('excel-clientes').click()">📥 Importar Excel</button>
+          <button class="btn btn-primary" onclick="openModalCliente()">➕ Nuevo cliente</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="search-clientes" placeholder="🔍 Buscar cliente..." oninput="renderClientes()">
+        <select id="sort-clientes" onchange="renderClientes()">
+          <option value="">Ordenar por...</option>
+          <option value="az">Nombre A → Z</option>
+          <option value="za">Nombre Z → A</option>
+          <option value="credito">Días crédito</option>
+          <option value="compra">Última compra</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th>RIF/ID</th><th>Días crédito</th><th>Marcas</th><th>Última compra</th><th>WhatsApp</th><th>Acciones</th></tr></thead>
+        <tbody id="tabla-clientes"></tbody>
+      </table></div>
+    </div>
+
+    <!-- ── FACTURAS ────────────────────────────────────────────────────────── -->
+    <div class="view" id="view-facturas">
+      <div class="section-header">
+        <h2>Registro de Facturas <span id="resumen-facturas" class="badge badge-blue" style="font-size:12px;vertical-align:middle;margin-left:6px"></span></h2>
+        <div class="actions">
+          <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(this)">
+          <button class="btn btn-ghost" onclick="descargarPlantillaFacturas()">📄 Descargar planilla</button>
+          <button class="btn btn-green" onclick="document.getElementById('excel-input').click()">📥 Importar Excel</button>
+          <button class="btn btn-primary" onclick="openModalFactura()">➕ Nueva factura</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="search-facturas" placeholder="🔍 Buscar..." oninput="renderFacturas()">
+        <select id="filter-estado" onchange="renderFacturas()">
+          <option value="">Todos los estados</option>
+          <option>Pendiente</option>
+          <option>Aviso 7d enviado</option>
+          <option>Aviso 5d enviado</option>
+          <option>Aviso 3d enviado</option>
+          <option>Aviso venc. enviado</option>
+          <option>Mora 7d enviado</option>
+          <option>Mora 14d enviado</option>
+          <option>Mora 21d enviado</option>
+          <option>Mora 28d+ enviado</option>
+          <option>Pagado</option>
+          <option>Incobrable</option>
+        </select>
+        <select id="filter-semaforo" onchange="renderFacturas()">
+          <option value="">Todo el semáforo</option>
+          <option value="green">🟢 Vigente</option>
+          <option value="yellow">🟡 ≤ 7 días</option>
+          <option value="orange">🟠 ≤ 3 días</option>
+          <option value="red">🔴 Vencida</option>
+        </select>
+        <select id="sort-facturas" onchange="renderFacturas()">
+          <option value="">Ordenar por...</option>
+          <option value="venc-asc">Vencimiento ↑ (más antigua)</option>
+          <option value="venc-desc">Vencimiento ↓ (más reciente)</option>
+          <option value="monto-desc">Mayor monto</option>
+          <option value="monto-asc">Menor monto</option>
+          <option value="mora-desc">Mayor mora</option>
+        </select>
+      </div>
+      <div class="table-wrap" style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>FAC #</th><th>Cliente</th><th>Monto (USD)</th>
+          <th>Emisión</th><th>Días cred.</th><th>Vencimiento</th>
+          <th>Días rest.</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="tabla-facturas"></tbody>
+      </table></div>
+    </div>
+
+    <!-- ── MENSAJES DEL DÍA ────────────────────────────────────────────────── -->
+    <div class="view" id="view-mensajes">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('tab-prev','tab-mora',this)">⏰ Recordatorios</div>
+        <div class="tab" onclick="switchTab('tab-mora','tab-prev',this)">🔴 Mora</div>
+      </div>
+      <div id="tab-prev"><div id="msgs-prev"></div></div>
+      <div id="tab-mora" style="display:none"><div id="msgs-mora"></div></div>
+    </div>
+
+    <!-- ── CONFIG / PLANTILLAS ─────────────────────────────────────────────── -->
+    <div class="view" id="view-config">
+      <div class="section-header"><h2>Plantillas de Mensajes</h2>
+        <button class="btn btn-primary" onclick="savePlantillas()">💾 Guardar cambios</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:18px">Variables disponibles: <code>{CLIENTE}</code> <code>{FAC}</code> <code>{MONTO}</code> <code>{FECHA_VENC}</code></p>
+      <div id="plantillas-container"></div>
+    </div>
+
+    <!-- ── DATOS / RESPALDO ─────────────────────────────────────────────── -->
+    <div class="view" id="view-datos">
+      <div class="section-header"><h2>Respaldo y Sincronización</h2></div>
+
+      <!-- Sync OneDrive -->
+      <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;border-left:5px solid var(--navy);margin-bottom:20px;max-width:700px">
+        <h3 style="font-size:15px;color:var(--navy);margin-bottom:8px">🔄 Sincronización automática con OneDrive</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Vincula la carpeta de la app para guardar y leer los datos automáticamente. Funciona en PC y celular con la misma carpeta de OneDrive.</p>
+        <div id="sync-status" style="font-size:13px;padding:10px;background:var(--sky);border-radius:7px;margin-bottom:14px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="vincularCarpeta()">📂 Vincular carpeta</button>
+          <button class="btn btn-green" onclick="guardarEnCarpeta()">💾 Guardar ahora</button>
+          <button class="btn btn-ghost" onclick="cargarDesdeCarpeta()">🔄 Cargar datos</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:700px">
+        <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;border-left:5px solid var(--green)">
+          <h3 style="font-size:15px;color:var(--navy);margin-bottom:8px">📤 Exportar datos</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Descarga un archivo de respaldo manual.</p>
+          <div id="export-stats" style="font-size:12px;color:var(--navy);margin-bottom:14px;padding:10px;background:var(--sky);border-radius:7px"></div>
+          <button class="btn btn-green" onclick="exportarDatos()" style="width:100%">📤 Exportar todo</button>
+        </div>
+
+        <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;border-left:5px solid var(--blue)">
+          <h3 style="font-size:15px;color:var(--navy);margin-bottom:8px">📥 Importar datos</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Carga un archivo de respaldo manual.</p>
+          <input type="file" id="import-datos" accept=".json" style="display:none" onchange="importarDatos(this)">
+          <button class="btn btn-primary" onclick="document.getElementById('import-datos').click()" style="width:100%">📥 Importar respaldo</button>
+          <button class="btn btn-ghost" onclick="if(confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')){localStorage.clear();location.reload();}" style="width:100%;margin-top:8px">🗑️ Borrar todos los datos</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ══ MODALES ═══════════════════════════════════════════════════════════════ -->
+
+<!-- Modal Cliente -->
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <h3 id="modal-cliente-title">Nuevo Cliente</h3>
+    <div class="form-grid">
+      <div class="form-group full"><label>Nombre del cliente *</label><input id="cli-nombre" type="text" placeholder="Ej: DISMATECO"></div>
+      <div class="form-group"><label>RIF / ID</label><input id="cli-rif" type="text" placeholder="J-12345678-9"></div>
+      <div class="form-group"><label>Días de crédito *</label>
+        <select id="cli-dias">
+          <option value="15">15 días</option><option value="21">21 días</option><option value="30" selected>30 días</option>
+          <option value="45">45 días</option><option value="60">60 días</option><option value="90">90 días</option>
+        </select>
+      </div>
+      <div class="form-group"><label>WhatsApp</label><input id="cli-wa" type="text" placeholder="+58 412-1234567"></div>
+      <div class="form-group"><label>Email</label><input id="cli-email" type="email" placeholder="cliente@mail.com"></div>
+      <div class="form-group"><label>Última compra</label><input id="cli-ultima-compra" type="date"></div>
+      <div class="form-group"><label>Marcas que compra</label><input id="cli-marcas" type="text" placeholder="Ej: Stanley, Truper, DeWalt"></div>
+      <div class="form-group full"><label>Mercancía / Productos</label><textarea id="cli-mercancia" rows="2" placeholder="Ej: Tornillos, Pinturas, Herramientas eléctricas..."></textarea></div>
+      <div class="form-group full"><label>Comentarios</label><textarea id="cli-obs" placeholder="Notas adicionales, acuerdos, condiciones especiales..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cliente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Factura -->
+<div class="modal-overlay" id="modal-factura">
+  <div class="modal">
+    <h3 id="modal-factura-title">Nueva Factura</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>N° Factura *</label><input id="fac-num" type="text" placeholder="Ej: 8409"></div>
+      <div class="form-group"><label>Cliente *</label>
+        <select id="fac-cliente"></select>
+      </div>
+      <div class="form-group"><label>Monto (USD) *</label><input id="fac-monto" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Fecha de emisión *</label><input id="fac-emision" type="date"></div>
+      <div class="form-group"><label>Días de crédito</label>
+        <select id="fac-dias">
+          <option value="15">15</option><option value="21">21</option><option value="30" selected>30</option>
+          <option value="45">45</option><option value="60">60</option><option value="90">90</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Estado</label>
+        <select id="fac-estado">
+          <option>Pendiente</option><option>Aviso 7d enviado</option><option>Aviso 5d enviado</option>
+          <option>Aviso 3d enviado</option><option>Aviso venc. enviado</option>
+          <option>Mora 7d enviado</option><option>Mora 14d enviado</option>
+          <option>Mora 21d enviado</option><option>Mora 28d+ enviado</option>
+          <option>Pagado</option><option>Incobrable</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Fecha de pago</label><input id="fac-fecha-pago" type="date"></div>
+      <div class="form-group"><label>Monto cobrado (USD)</label><input id="fac-cobrado" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group full"><label>Observaciones</label><textarea id="fac-obs" placeholder="Notas..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-factura')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveFactura()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"><span id="toast-msg"></span></div>
+
+<!-- Modal Detalle Cliente -->
+<div class="modal-overlay" id="modal-detalle-cli">
+  <div class="modal" style="width:620px">
+    <h3 id="detalle-cli-title">Detalle del Cliente</h3>
+    <div id="detalle-cli-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-detalle-cli')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCRIPT ══════════════════════════════════════════════════════════════════ -->
+<script>
+// ── Storage ──────────────────────────────────────────────────────────────────
+let _dirHandle = null;
+let _syncTimer = null;
+const DB = {
+  get: k => JSON.parse(localStorage.getItem('cobApp_'+k)||'null'),
+  set: (k,v) => {
+    localStorage.setItem('cobApp_'+k, JSON.stringify(v));
+    // Auto-guardar en carpeta vinculada (con debounce)
+    if(_dirHandle){
+      clearTimeout(_syncTimer);
+      _syncTimer = setTimeout(()=> guardarEnCarpeta(true), 1500);
+    }
+  },
+};
+
+// ── IndexedDB para persistir el handle de carpeta ────────────────────────────
+function abrirIDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('cobApp_sync',1);
+    req.onupgradeneeded=()=>req.result.createObjectStore('handles');
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function guardarHandle(handle){
+  const db=await abrirIDB();
+  const tx=db.transaction('handles','readwrite');
+  tx.objectStore('handles').put(handle,'dirHandle');
+}
+async function recuperarHandle(){
+  const db=await abrirIDB();
+  return new Promise(res=>{
+    const tx=db.transaction('handles','readonly');
+    const req=tx.objectStore('handles').get('dirHandle');
+    req.onsuccess=()=>res(req.result||null);
+    req.onerror=()=>res(null);
+  });
+}
+
+// ── Sincronización con carpeta (OneDrive) ────────────────────────────────────
+async function vincularCarpeta(){
+  if(!window.showDirectoryPicker){
+    toast('⚠️ Tu navegador no soporta esta función. Usa Chrome o Edge.');
+    return;
+  }
+  try{
+    _dirHandle = await window.showDirectoryPicker({mode:'readwrite'});
+    await guardarHandle(_dirHandle);
+    actualizarSyncStatus();
+    toast('✅ Carpeta vinculada correctamente');
+  }catch(e){
+    if(e.name!=='AbortError') toast('❌ Error: '+e.message);
+  }
+}
+
+async function guardarEnCarpeta(silencioso){
+  if(!_dirHandle){
+    if(!silencioso) toast('⚠️ Primero vincula una carpeta');
+    return;
+  }
+  try{
+    const perm = await _dirHandle.queryPermission({mode:'readwrite'});
+    if(perm!=='granted'){
+      const req = await _dirHandle.requestPermission({mode:'readwrite'});
+      if(req!=='granted'){toast('⚠️ Permiso denegado');return;}
+    }
+    const data={
+      version:'1.0',
+      ultimaSync:new Date().toISOString(),
+      clientes:DB.get('clientes')||[],
+      facturas:DB.get('facturas')||[],
+      plantillas:DB.get('plantillas')||[]
+    };
+    const fileHandle = await _dirHandle.getFileHandle('datos.json',{create:true});
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(data,null,2));
+    await writable.close();
+    localStorage.setItem('cobApp_lastSync',data.ultimaSync);
+    if(!silencioso){
+      actualizarSyncStatus();
+      toast('💾 Datos guardados en OneDrive');
+    }
+  }catch(e){
+    if(!silencioso) toast('❌ Error al guardar: '+e.message);
+  }
+}
+
+async function cargarDesdeCarpeta(){
+  if(!_dirHandle){toast('⚠️ Primero vincula una carpeta');return;}
+  try{
+    const perm = await _dirHandle.queryPermission({mode:'read'});
+    if(perm!=='granted'){
+      const req = await _dirHandle.requestPermission({mode:'read'});
+      if(req!=='granted'){toast('⚠️ Permiso denegado');return;}
+    }
+    const fileHandle = await _dirHandle.getFileHandle('datos.json');
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data.clientes&&!data.facturas){toast('⚠️ Archivo no válido');return;}
+    const cl=(data.clientes||[]).length, fa=(data.facturas||[]).length;
+    if(!confirm(`¿Cargar datos desde OneDrive?\n\n${cl} clientes, ${fa} facturas\n\nEsto reemplazará los datos actuales.`))return;
+    if(data.clientes) DB.set('clientes',data.clientes);
+    if(data.facturas) DB.set('facturas',data.facturas);
+    if(data.plantillas) DB.set('plantillas',data.plantillas);
+    localStorage.setItem('cobApp_lastSync',data.ultimaSync||new Date().toISOString());
+    actualizarSyncStatus();
+    renderDashboard();
+    toast('✅ Datos cargados desde OneDrive');
+  }catch(e){
+    if(e.name==='NotFoundError') toast('ℹ️ No hay archivo datos.json en la carpeta. Guarda primero desde otro dispositivo.');
+    else toast('❌ Error: '+e.message);
+  }
+}
+
+function actualizarSyncStatus(){
+  const el=document.getElementById('sync-status');
+  if(!el)return;
+  const lastSync=localStorage.getItem('cobApp_lastSync');
+  if(_dirHandle){
+    const syncText=lastSync?`Última sincronización: ${new Date(lastSync).toLocaleString('es-VE')}`:'Sin sincronizar aún';
+    el.innerHTML=`🟢 <b>Carpeta vinculada</b> · ${syncText} · <span style="color:var(--muted)">Auto-guardado activo</span>`;
+  } else {
+    el.innerHTML='🔴 <b>Sin vincular</b> — presiona "Vincular carpeta" y selecciona la carpeta CobranzaApp en OneDrive';
+  }
+}
+
+// Intentar recuperar handle al iniciar
+async function initSync(){
+  try{
+    const handle = await recuperarHandle();
+    if(handle){
+      const perm = await handle.queryPermission({mode:'readwrite'});
+      if(perm==='granted'){
+        _dirHandle=handle;
+        actualizarSyncStatus();
+      } else {
+        _dirHandle=handle;
+        actualizarSyncStatus();
+      }
+    } else {
+      actualizarSyncStatus();
+    }
+  }catch(e){ actualizarSyncStatus(); }
+}
+initSync();
+
+// ── Initial Data ─────────────────────────────────────────────────────────────
+function initData(){
+  if(!DB.get('clientes')) DB.set('clientes',[
+    {id:1,nombre:'DISMATECO',rif:'J-12345678-9',dias:30,wa:'+58 412-1234567',email:'',obs:''},
+    {id:2,nombre:'FERSIL',rif:'J-98765432-1',dias:30,wa:'+58 414-7654321',email:'',obs:''},
+    {id:3,nombre:'FERREMALL 2023',rif:'J-11223344-5',dias:45,wa:'+58 424-1122334',email:'',obs:'Crédito especial'},
+    {id:4,nombre:'INVERSIONES FERQUINCA',rif:'J-55667788-9',dias:60,wa:'+58 416-5566778',email:'',obs:''},
+    {id:5,nombre:'CONSTRUFASIL ARAGUA',rif:'J-33445566-7',dias:30,wa:'+58 412-3344556',email:'',obs:''},
+  ]);
+  if(!DB.get('facturas')){
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = (offset) => { const x=new Date(today); x.setDate(x.getDate()+offset); return x.toISOString().split('T')[0]; };
+    DB.set('facturas',[
+      {id:1,num:'8409',clienteId:1,monto:1250.00,emision:d(-43),dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+      {id:2,num:'8859',clienteId:2,monto:870.50, emision:d(-43),dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+      {id:3,num:'3345',clienteId:3,monto:2100.00,emision:d(-12),dias:45,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+      {id:4,num:'3359',clienteId:4,monto:3400.75,emision:d(-8), dias:60,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+      {id:5,num:'3558',clienteId:5,monto:560.00, emision:d(-12),dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+      {id:6,num:'9001',clienteId:1,monto:1800.00,emision:d(3),  dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+      {id:7,num:'9002',clienteId:2,monto:420.25, emision:d(-1), dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
+    ]);
+  }
+  if(!DB.get('plantillas')) DB.set('plantillas', defaultPlantillas());
+}
+
+function defaultPlantillas(){
+  return [
+    {id:'p7',tipo:'⏰ Recordatorio 7 días',dias:7,mora:false,
+     msg:'Estimado/a {CLIENTE}, le recordamos que la factura N° {FAC} por {MONTO} vence el {FECHA_VENC} (en 7 días). Por favor planifique su pago. — FEBECA'},
+    {id:'p5',tipo:'⏰ Recordatorio 5 días',dias:5,mora:false,
+     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} vence en 5 días, el {FECHA_VENC}. Le agradecemos gestionar el pago. — FEBECA'},
+    {id:'p3',tipo:'⚠️ Recordatorio 3 días',dias:3,mora:false,
+     msg:'Estimado/a {CLIENTE}, AVISO: la factura N° {FAC} por {MONTO} vence en 3 días ({FECHA_VENC}). Realice su pago para evitar recargos. — FEBECA'},
+    {id:'p0',tipo:'🔴 Último día de vencimiento',dias:0,mora:false,
+     msg:'Estimado/a {CLIENTE}, HOY VENCE la factura N° {FAC} por {MONTO}. Realice el pago hoy para evitar intereses de mora. — FEBECA'},
+    {id:'m7',tipo:'🔴 Mora +7 días',dias:7,mora:true,
+     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} venció el {FECHA_VENC} y tiene 7 días de mora. Regularice su pago a la brevedad. — FEBECA'},
+    {id:'m14',tipo:'🔴 Mora +14 días',dias:14,mora:true,
+     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} acumula 14 días de mora (venció el {FECHA_VENC}). Comuníquese con su vendedor para acordar pago. — FEBECA'},
+    {id:'m21',tipo:'⚠️ Mora +21 días',dias:21,mora:true,
+     msg:'Estimado/a {CLIENTE}, AVISO URGENTE: la factura N° {FAC} por {MONTO} lleva 21 días vencida ({FECHA_VENC}). Contáctenos HOY. — FEBECA'},
+    {id:'m28',tipo:'🚨 Mora +28 días',dias:28,mora:true,
+     msg:'Estimado/a {CLIENTE}, ÚLTIMO AVISO: la factura N° {FAC} por {MONTO} lleva más de 28 días vencida desde el {FECHA_VENC}. Procederemos con cobranza formal. — FEBECA'},
+  ];
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+let nextCliId = ()=>{ const c=DB.get('clientes'); return c.length? Math.max(...c.map(x=>x.id))+1:1; };
+let nextFacId = ()=>{ const f=DB.get('facturas'); return f.length? Math.max(...f.map(x=>x.id))+1:1; };
+
+function today(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function parseDate(s){ const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setHours(0,0,0,0); return dt; }
+function fmtDate(s){ if(!s)return ''; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; }
+function addDays(dateStr, n){ const d=parseDate(dateStr); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
+function diffDays(dateStr){ return Math.round((parseDate(dateStr)-today())/(86400000)); }
+function fmtMoney(v){ return '$'+Number(v||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function vencimiento(fac){ return addDays(fac.emision, Number(fac.dias)); }
+
+function semaforoClass(dias){
+  if(dias<0)  return 'red';
+  if(dias<=3) return 'orange';
+  if(dias<=7) return 'yellow';
+  return 'green';
+}
+function semaforoBadge(dias){
+  const c=semaforoClass(dias);
+  const labels={green:'🟢 Vigente',yellow:'🟡 ≤ 7 días',orange:'🟠 ≤ 3 días',red:'🔴 Vencida'};
+  return `<span class="badge badge-${c}">${labels[c]} (${dias}d)</span>`;
+}
+function estadoBadge(e){
+  const map={
+    'Pendiente':'gray','Pagado':'green','Incobrable':'red',
+    'Aviso 7d enviado':'blue','Aviso 5d enviado':'blue','Aviso 3d enviado':'blue',
+    'Aviso venc. enviado':'orange',
+    'Mora 7d enviado':'darkred','Mora 14d enviado':'darkred',
+    'Mora 21d enviado':'darkred','Mora 28d+ enviado':'darkred',
+  };
+  return `<span class="badge badge-${map[e]||'gray'}">${e}</span>`;
+}
+
+function buildMsg(plantilla, fac, cliente){
+  const venc = vencimiento(fac);
+  return plantilla.msg
+    .replace(/{CLIENTE}/g, cliente.nombre)
+    .replace(/{FAC}/g, fac.num)
+    .replace(/{MONTO}/g, fmtMoney(fac.monto))
+    .replace(/{FECHA_VENC}/g, fmtDate(venc));
+}
+
+function limpiarWa(raw){
+  if(!raw) return '';
+  let n = String(raw).replace(/[^\d+]/g,'');
+  if(!n) return '';
+  // Si Excel lo convirtió a número (ej: 584121234567), agregar +
+  if(!n.startsWith('+') && n.length >= 10) n = '+' + n;
+  return n;
+}
+
+function waLink(phone, msg){
+  const clean = (phone||'').replace(/\D/g,'');
+  return `whatsapp://send?phone=${clean}&text=${encodeURIComponent(msg)}`;
+}
+function openWa(url){
+  window.location.href = url;
+}
+
+function toast(msg, duration=2500){
+  const el=document.getElementById('toast');
+  document.getElementById('toast-msg').textContent=msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), duration);
+}
+
+function copyText(text){
+  navigator.clipboard.writeText(text).then(()=>toast('✅ Mensaje copiado'));
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const viewTitles={dashboard:'Dashboard',clientes:'Clientes',facturas:'Facturas',mensajes:'Mensajes del Día',config:'Plantillas de Mensajes',datos:'Respaldo y Sincronización'};
+function showView(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('#sidebar nav a').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('#sidebar nav a')[['dashboard','clientes','facturas','mensajes','config','datos'].indexOf(v)].classList.add('active');
+  document.getElementById('view-title').textContent=viewTitles[v];
+  if(v==='dashboard')  renderDashboard();
+  if(v==='clientes')   renderClientes();
+  if(v==='facturas')   renderFacturas();
+  if(v==='mensajes')   renderMensajes();
+  if(v==='config')     renderConfig();
+  if(v==='datos')      renderDatos();
+}
+
+function switchTab(showId, hideId, el){
+  document.getElementById(showId).style.display='';
+  document.getElementById(hideId).style.display='none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function renderDashboard(){
+  const facturas = DB.get('facturas')||[];
+  const clientes = DB.get('clientes')||[];
+  const td = today();
+
+  const activas = facturas.filter(f=>f.estado!=='Pagado'&&f.estado!=='Incobrable');
+  const enCalle = activas.reduce((s,f)=>s+Number(f.monto||0),0);
+  const vencidas = activas.filter(f=>diffDays(vencimiento(f))<0);
+  const hoy0 = activas.filter(f=>diffDays(vencimiento(f))===0);
+  const prox3 = activas.filter(f=>{const d=diffDays(vencimiento(f));return d>0&&d<=3;});
+  const prox7 = activas.filter(f=>{const d=diffDays(vencimiento(f));return d>0&&d<=7;});
+  const pagadas = facturas.filter(f=>f.estado==='Pagado');
+  const cobrado = pagadas.reduce((s,f)=>s+Number(f.cobrado||0),0);
+
+  // Avisos hoy
+  const plantillas = DB.get('plantillas')||[];
+  const pNoMora = plantillas.filter(p=>!p.mora);
+  const pMora   = plantillas.filter(p=>p.mora);
+  let avisosHoy=[];
+  activas.forEach(f=>{
+    const venc = vencimiento(f);
+    pNoMora.forEach(p=>{
+      const fechaAviso = addDays(venc, -p.dias);
+      if(fechaAviso===td.toISOString().split('T')[0]) avisosHoy.push({f,p,tipo:'prev'});
+    });
+    if(diffDays(venc)<0){
+      const diasMora = Math.abs(diffDays(venc));
+      pMora.forEach(p=>{
+        const fechaMora = addDays(venc, p.dias);
+        if(fechaMora===td.toISOString().split('T')[0]) avisosHoy.push({f,p,tipo:'mora'});
+      });
+    }
+  });
+
+  // KPIs
+  const kpis=[
+    {label:'Facturas activas',value:activas.length,sub:'pendientes de cobro',icon:'📄',color:''},
+    {label:'Total en calle',value:fmtMoney(enCalle),sub:'USD por cobrar',icon:'💰',color:'blue',raw:true},
+    {label:'Facturas vencidas',value:vencidas.length,sub:'en mora',icon:'⏰',color:'red'},
+    {label:'Vencen hoy',value:hoy0.length,sub:'requieren atención hoy',icon:'🔔',color:'orange'},
+    {label:'Vencen en ≤ 3 días',value:prox3.length,sub:'urgentes',icon:'⚠️',color:'orange'},
+    {label:'Avisos a enviar HOY',value:avisosHoy.length,sub:'mensajes pendientes',icon:'📲',color:'purple'},
+    {label:'Facturas cobradas',value:pagadas.length,sub:'completadas',icon:'✅',color:'green'},
+    {label:'Total cobrado',value:fmtMoney(cobrado),sub:'USD recuperado',icon:'🏆',color:'green',raw:true},
+  ];
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
+    <div class="kpi-card ${k.color}">
+      <div class="kpi-icon">${k.icon}</div>
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.raw?k.value:k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  // Tabla mensajes hoy
+  const tbMsgs = document.getElementById('dash-msgs');
+  if(!avisosHoy.length){
+    tbMsgs.innerHTML=`<tr><td colspan="4" class="no-data">Sin mensajes para hoy 🎉</td></tr>`;
+  } else {
+    tbMsgs.innerHTML = avisosHoy.slice(0,8).map(({f,p})=>{
+      const cli = clientes.find(c=>c.id===f.clienteId)||{nombre:'?',wa:''};
+      return `<tr>
+        <td><b>${cli.nombre}</b></td>
+        <td>${f.num}</td>
+        <td>${p.tipo}</td>
+        <td><button class="btn btn-wa btn-sm" onclick="showView('mensajes')">Ver</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Tabla mora
+  const tbMora = document.getElementById('dash-mora');
+  if(!vencidas.length){
+    tbMora.innerHTML=`<tr><td colspan="4" class="no-data">Sin facturas en mora 🎉</td></tr>`;
+  } else {
+    tbMora.innerHTML = vencidas.slice(0,8).map(f=>{
+      const cli = clientes.find(c=>c.id===f.clienteId)||{nombre:'?'};
+      const dias = Math.abs(diffDays(vencimiento(f)));
+      return `<tr>
+        <td><b>${cli.nombre}</b></td>
+        <td>${f.num}</td>
+        <td><span class="badge badge-red">-${dias}d</span></td>
+        <td>${fmtMoney(f.monto)}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ── CLIENTES ──────────────────────────────────────────────────────────────────
+let editingCliId = null;
+function renderClientes(){
+  const q=(document.getElementById('search-clientes').value||'').toLowerCase();
+  const total=(DB.get('clientes')||[]).length;
+  const clientes=(DB.get('clientes')||[]).filter(c=>!q||c.nombre.toLowerCase().includes(q)||(c.rif||'').toLowerCase().includes(q));
+  document.getElementById('contador-clientes').textContent=q?`${clientes.length} de ${total}`:total;
+  const sortVal=(document.getElementById('sort-clientes')||{}).value||'';
+  if(sortVal==='az')  clientes.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(sortVal==='za')  clientes.sort((a,b)=>b.nombre.localeCompare(a.nombre));
+  if(sortVal==='credito') clientes.sort((a,b)=>(a.dias||30)-(b.dias||30));
+  if(sortVal==='compra')  clientes.sort((a,b)=>(b.ultimaCompra||'').localeCompare(a.ultimaCompra||''));
+  const tbody=document.getElementById('tabla-clientes');
+  if(!clientes.length){tbody.innerHTML=`<tr><td colspan="7" class="no-data">No hay clientes. ¡Agrega el primero!</td></tr>`;return;}
+  tbody.innerHTML=clientes.map(c=>`
+    <tr>
+      <td><b>${c.nombre}</b>${c.mercancia?`<br><span style="font-size:11px;color:var(--muted)">${c.mercancia}</span>`:''}</td>
+      <td>${c.rif||'—'}</td>
+      <td><span class="badge badge-blue">${c.dias} días</span></td>
+      <td>${c.marcas?`<span style="font-size:12px">${c.marcas}</span>`:'—'}</td>
+      <td>${c.ultimaCompra?fmtDate(c.ultimaCompra):'—'}</td>
+      <td>${c.wa?`<a href="https://wa.me/${c.wa.replace(/\D/g,'')}" target="_blank" style="color:var(--green);font-weight:600">${c.wa}</a>`:'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-wa btn-sm" title="Cobro masivo: enviar todas las vencidas" onclick="cobroMasivo(${c.id})">💬 Cobro</button>
+        <button class="btn-icon" title="Ver detalle" onclick="openDetalleCliente(${c.id})">👁️</button>
+        <button class="btn-icon" title="Editar" onclick="openModalCliente(${c.id})">✏️</button>
+        <button class="btn-icon" title="Eliminar" onclick="deleteCliente(${c.id})">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openModalCliente(id=null){
+  editingCliId=id;
+  document.getElementById('modal-cliente-title').textContent=id?'Editar Cliente':'Nuevo Cliente';
+  if(id){
+    const c=(DB.get('clientes')||[]).find(x=>x.id===id);
+    if(!c)return;
+    document.getElementById('cli-nombre').value=c.nombre||'';
+    document.getElementById('cli-rif').value=c.rif||'';
+    document.getElementById('cli-dias').value=c.dias||30;
+    document.getElementById('cli-wa').value=c.wa||'';
+    document.getElementById('cli-email').value=c.email||'';
+    document.getElementById('cli-marcas').value=c.marcas||'';
+    document.getElementById('cli-mercancia').value=c.mercancia||'';
+    document.getElementById('cli-ultima-compra').value=c.ultimaCompra||'';
+    document.getElementById('cli-obs').value=c.obs||'';
+  } else {
+    ['cli-nombre','cli-rif','cli-wa','cli-email','cli-obs','cli-marcas','cli-mercancia'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cli-dias').value=30;
+    document.getElementById('cli-ultima-compra').value='';
+  }
+  document.getElementById('modal-cliente').classList.add('open');
+}
+
+function saveCliente(){
+  const nombre=document.getElementById('cli-nombre').value.trim();
+  if(!nombre){toast('⚠️ El nombre es obligatorio');return;}
+  const obj={
+    nombre,rif:document.getElementById('cli-rif').value.trim(),
+    dias:Number(document.getElementById('cli-dias').value),
+    wa:document.getElementById('cli-wa').value.trim(),
+    email:document.getElementById('cli-email').value.trim(),
+    marcas:document.getElementById('cli-marcas').value.trim(),
+    mercancia:document.getElementById('cli-mercancia').value.trim(),
+    ultimaCompra:document.getElementById('cli-ultima-compra').value,
+    obs:document.getElementById('cli-obs').value.trim(),
+  };
+  let clientes=DB.get('clientes')||[];
+  if(editingCliId){ clientes=clientes.map(c=>c.id===editingCliId?{...c,...obj}:c); toast('✅ Cliente actualizado');}
+  else { clientes.push({...obj,id:nextCliId()}); toast('✅ Cliente agregado'); }
+  DB.set('clientes',clientes);
+  closeModal('modal-cliente');
+  renderClientes();
+}
+
+function deleteCliente(id){
+  if(!confirm('¿Eliminar este cliente?'))return;
+  DB.set('clientes',(DB.get('clientes')||[]).filter(c=>c.id!==id));
+  renderClientes(); toast('🗑️ Cliente eliminado');
+}
+
+function openDetalleCliente(id){
+  const c=(DB.get('clientes')||[]).find(x=>x.id===id);
+  if(!c)return;
+  const facturas=(DB.get('facturas')||[]).filter(f=>f.clienteId===id);
+  const activas=facturas.filter(f=>f.estado!=='Pagado'&&f.estado!=='Incobrable');
+  const totalDeuda=activas.reduce((s,f)=>s+Number(f.monto||0),0);
+
+  document.getElementById('detalle-cli-title').textContent=c.nombre;
+  document.getElementById('detalle-cli-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
+      <div><span style="font-size:11px;color:var(--muted);text-transform:uppercase">RIF</span><br><b>${c.rif||'—'}</b></div>
+      <div><span style="font-size:11px;color:var(--muted);text-transform:uppercase">Crédito</span><br><b>${c.dias} días</b></div>
+      <div><span style="font-size:11px;color:var(--muted);text-transform:uppercase">WhatsApp</span><br><b>${c.wa||'—'}</b></div>
+      <div><span style="font-size:11px;color:var(--muted);text-transform:uppercase">Última compra</span><br><b>${c.ultimaCompra?fmtDate(c.ultimaCompra):'Sin registro'}</b></div>
+      <div><span style="font-size:11px;color:var(--muted);text-transform:uppercase">Marcas</span><br><b>${c.marcas||'—'}</b></div>
+      <div><span style="font-size:11px;color:var(--muted);text-transform:uppercase">Deuda activa</span><br><b style="color:${totalDeuda>0?'var(--red)':'var(--green)'}">${fmtMoney(totalDeuda)}</b></div>
+      <div class="full" style="grid-column:1/-1"><span style="font-size:11px;color:var(--muted);text-transform:uppercase">Mercancía / Productos</span><br>${c.mercancia||'—'}</div>
+      <div class="full" style="grid-column:1/-1"><span style="font-size:11px;color:var(--muted);text-transform:uppercase">Comentarios</span><br>${c.obs||'—'}</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Facturas (${facturas.length})</div>
+    <div style="max-height:220px;overflow-y:auto">
+    <table style="font-size:12px"><thead><tr style="background:var(--navy);color:#fff">
+      <th style="padding:6px 10px">FAC</th><th style="padding:6px 10px">Monto</th><th style="padding:6px 10px">Vencimiento</th><th style="padding:6px 10px">Estado</th>
+    </tr></thead><tbody>
+    ${facturas.length?facturas.map(f=>{
+      const venc=vencimiento(f);const dias=diffDays(venc);
+      return `<tr><td style="padding:6px 10px"><b>${f.num}</b></td><td style="padding:6px 10px">${fmtMoney(f.monto)}</td><td style="padding:6px 10px">${fmtDate(venc)} ${semaforoBadge(dias)}</td><td style="padding:6px 10px">${estadoBadge(f.estado)}</td></tr>`;
+    }).join(''):'<tr><td colspan="4" class="no-data">Sin facturas</td></tr>'}
+    </tbody></table></div>`;
+  document.getElementById('modal-detalle-cli').classList.add('open');
+}
+
+// ── FACTURAS ──────────────────────────────────────────────────────────────────
+let editingFacId=null;
+function renderFacturas(){
+  const q=(document.getElementById('search-facturas').value||'').toLowerCase();
+  const estFil=document.getElementById('filter-estado').value;
+  const semFil=document.getElementById('filter-semaforo').value;
+  const clientes=DB.get('clientes')||[];
+  let facturas=(DB.get('facturas')||[]).filter(f=>{
+    const cli=clientes.find(c=>c.id===f.clienteId)||{nombre:''};
+    if(q&&!f.num.toLowerCase().includes(q)&&!cli.nombre.toLowerCase().includes(q))return false;
+    if(estFil&&f.estado!==estFil)return false;
+    if(semFil){
+      const dias=diffDays(vencimiento(f));
+      if(semFil==='green'&&dias<=7)return false;
+      if(semFil==='yellow'&&(dias<=3||dias>7))return false;
+      if(semFil==='orange'&&(dias<0||dias>3))return false;
+      if(semFil==='red'&&dias>=0)return false;
+    }
+    return true;
+  });
+  const totalMonto=facturas.reduce((s,f)=>s+Number(f.monto||0),0);
+  const totalAll=(DB.get('facturas')||[]).length;
+  const resumen=document.getElementById('resumen-facturas');
+  if(resumen) resumen.textContent=`${facturas.length}${facturas.length!==totalAll?' de '+totalAll:''} facturas · ${fmtMoney(totalMonto)}`;
+  const sortVal=(document.getElementById('sort-facturas')||{}).value||'';
+  if(sortVal==='venc-desc') facturas.sort((a,b)=>parseDate(vencimiento(b))-parseDate(vencimiento(a)));
+  else if(sortVal==='monto-desc')facturas.sort((a,b)=>(b.monto||0)-(a.monto||0));
+  else if(sortVal==='monto-asc') facturas.sort((a,b)=>(a.monto||0)-(b.monto||0));
+  else if(sortVal==='mora-desc') facturas.sort((a,b)=>diffDays(vencimiento(a))-diffDays(vencimiento(b)));
+  else facturas.sort((a,b)=>parseDate(vencimiento(a))-parseDate(vencimiento(b)));
+  const tbody=document.getElementById('tabla-facturas');
+  if(!facturas.length){tbody.innerHTML=`<tr><td colspan="9" class="no-data">No hay facturas que coincidan</td></tr>`;return;}
+  tbody.innerHTML=facturas.map(f=>{
+    const cli=clientes.find(c=>c.id===f.clienteId)||{nombre:'?'};
+    const venc=vencimiento(f);
+    const dias=diffDays(venc);
+    return `<tr>
+      <td><b>${f.num}</b></td>
+      <td>${cli.nombre}</td>
+      <td style="text-align:right">${fmtMoney(f.monto)}</td>
+      <td>${fmtDate(f.emision)}</td>
+      <td style="text-align:center">${f.dias}d</td>
+      <td style="text-align:center;font-weight:600">${fmtDate(venc)}</td>
+      <td>${semaforoBadge(dias)}</td>
+      <td>${estadoBadge(f.estado)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-wa btn-sm" onclick="enviarMensajeFactura(${f.id})" title="Enviar mensaje de cobro">💬 Enviar</button>
+        <button class="btn-icon" title="Editar" onclick="openModalFactura(${f.id})">✏️</button>
+        <button class="btn-icon" title="Marcar pagado" onclick="marcarPagado(${f.id})">✅</button>
+        <button class="btn-icon" title="Eliminar" onclick="deleteFactura(${f.id})">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openModalFactura(id=null){
+  editingFacId=id;
+  document.getElementById('modal-factura-title').textContent=id?'Editar Factura':'Nueva Factura';
+  const clientes=DB.get('clientes')||[];
+  const sel=document.getElementById('fac-cliente');
+  sel.innerHTML=clientes.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(c=>`<option value="${c.id}">${c.nombre} (${c.dias}d)</option>`).join('');
+  if(id){
+    const f=(DB.get('facturas')||[]).find(x=>x.id===id);
+    if(!f)return;
+    document.getElementById('fac-num').value=f.num||'';
+    sel.value=f.clienteId;
+    document.getElementById('fac-monto').value=f.monto||'';
+    document.getElementById('fac-emision').value=f.emision||'';
+    document.getElementById('fac-dias').value=f.dias||30;
+    document.getElementById('fac-estado').value=f.estado||'Pendiente';
+    document.getElementById('fac-fecha-pago').value=f.fechaPago||'';
+    document.getElementById('fac-cobrado').value=f.cobrado||'';
+    document.getElementById('fac-obs').value=f.obs||'';
+  } else {
+    ['fac-num','fac-monto','fac-fecha-pago','fac-cobrado','fac-obs'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('fac-emision').value=today().toISOString().split('T')[0];
+    document.getElementById('fac-dias').value=30;
+    document.getElementById('fac-estado').value='Pendiente';
+    // auto-fill días crédito from client
+    sel.onchange=()=>{
+      const cli=clientes.find(c=>c.id===Number(sel.value));
+      if(cli) document.getElementById('fac-dias').value=cli.dias;
+    };
+  }
+  document.getElementById('modal-factura').classList.add('open');
+}
+
+function saveFactura(){
+  const num=document.getElementById('fac-num').value.trim();
+  const clienteId=Number(document.getElementById('fac-cliente').value);
+  const monto=document.getElementById('fac-monto').value;
+  const emision=document.getElementById('fac-emision').value;
+  if(!num||!clienteId||!monto||!emision){toast('⚠️ Completa los campos obligatorios');return;}
+  const obj={num,clienteId,monto:Number(monto),emision,
+    dias:Number(document.getElementById('fac-dias').value),
+    estado:document.getElementById('fac-estado').value,
+    fechaPago:document.getElementById('fac-fecha-pago').value,
+    cobrado:Number(document.getElementById('fac-cobrado').value||0),
+    obs:document.getElementById('fac-obs').value.trim()};
+  let facturas=DB.get('facturas')||[];
+  if(editingFacId){facturas=facturas.map(f=>f.id===editingFacId?{...f,...obj}:f);toast('✅ Factura actualizada');}
+  else{facturas.push({...obj,id:nextFacId()});toast('✅ Factura agregada');}
+  DB.set('facturas',facturas);
+  closeModal('modal-factura');
+  renderFacturas();
+}
+
+function enviarMensajeFactura(id){
+  const facturas = DB.get('facturas')||[];
+  const clientes = DB.get('clientes')||[];
+  const plantillas = DB.get('plantillas')||[];
+  const f = facturas.find(x=>x.id===id);
+  if(!f) return;
+  const cli = clientes.find(c=>c.id===f.clienteId)||{nombre:'?',wa:''};
+  if(!cli.wa){ toast('⚠️ Este cliente no tiene WhatsApp registrado'); return; }
+
+  // Calcular días exactos al momento del clic (hoy a medianoche vs fecha vencimiento)
+  const venc = vencimiento(f);
+  const dias = diffDays(venc); // positivo = faltan días, negativo = mora
+
+  let plantilla;
+  if(dias > 7) {
+    // Aún fuera de ventana de recordatorios → usar aviso 7d igual
+    plantilla = plantillas.find(p=>p.id==='p7');
+  } else if(dias >= 6) {
+    plantilla = plantillas.find(p=>p.id==='p7');
+  } else if(dias >= 4) {
+    plantilla = plantillas.find(p=>p.id==='p5');
+  } else if(dias >= 1) {
+    plantilla = plantillas.find(p=>p.id==='p3');
+  } else if(dias === 0) {
+    plantilla = plantillas.find(p=>p.id==='p0');
+  } else {
+    // Mora: días vencida acumulados
+    const mora = Math.abs(dias);
+    if(mora <= 7)       plantilla = plantillas.find(p=>p.id==='m7');
+    else if(mora <= 14) plantilla = plantillas.find(p=>p.id==='m14');
+    else if(mora <= 21) plantilla = plantillas.find(p=>p.id==='m21');
+    else                plantilla = plantillas.find(p=>p.id==='m28');
+  }
+
+  if(!plantilla){ toast('⚠️ No se encontró plantilla para esta factura'); return; }
+
+  const msg = buildMsg(plantilla, f, cli);
+  const link = waLink(cli.wa, msg);
+  openWa(link);
+
+  // Actualizar estado automáticamente
+  const estadoMap = {
+    p7:'Aviso 7d enviado', p5:'Aviso 5d enviado', p3:'Aviso 3d enviado',
+    p0:'Aviso venc. enviado', m7:'Mora 7d enviado', m14:'Mora 14d enviado',
+    m21:'Mora 21d enviado', m28:'Mora 28d+ enviado'
+  };
+  const nuevoEstado = estadoMap[plantilla.id];
+  if(nuevoEstado){
+    DB.set('facturas', facturas.map(x=>x.id===id?{...x,estado:nuevoEstado}:x));
+    renderFacturas();
+    toast('💬 WhatsApp abierto · Estado: '+nuevoEstado);
+  }
+}
+
+function cobroMasivo(clienteId){
+  const clientes=DB.get('clientes')||[];
+  const cli=clientes.find(c=>c.id===clienteId);
+  if(!cli){toast('⚠️ Cliente no encontrado');return;}
+  if(!cli.wa){toast('⚠️ Este cliente no tiene WhatsApp registrado');return;}
+
+  let facturas=DB.get('facturas')||[];
+  const vencidas=facturas.filter(f=>f.clienteId===clienteId&&f.estado!=='Pagado'&&f.estado!=='Incobrable'&&diffDays(vencimiento(f))<0);
+
+  if(!vencidas.length){toast('ℹ️ Este cliente no tiene facturas vencidas');return;}
+
+  const totalDeuda=vencidas.reduce((s,f)=>s+Number(f.monto||0),0);
+  const detalle=vencidas.map(f=>{
+    const dias=Math.abs(diffDays(vencimiento(f)));
+    return `• FAC ${f.num} — ${fmtMoney(f.monto)} (${dias} días de mora)`;
+  }).join('\n');
+
+  const msg=`Estimado/a ${cli.nombre},\n\nLe informamos que tiene ${vencidas.length} factura(s) vencida(s) por un total de ${fmtMoney(totalDeuda)}:\n\n${detalle}\n\nLe agradecemos regularizar su situación a la brevedad.\n— FEBECA`;
+
+  openWa(waLink(cli.wa, msg));
+
+  const ids=vencidas.map(f=>f.id);
+  facturas=facturas.map(f=>ids.includes(f.id)?{...f,estado:'Mora cobro masivo enviado'}:f);
+  DB.set('facturas',facturas);
+  renderFacturas();
+  renderClientes();
+  toast(`💬 Cobro masivo enviado: ${vencidas.length} facturas de ${cli.nombre}`);
+}
+
+function marcarPagado(id){
+  const fechaPago=prompt('Fecha de pago (AAAA-MM-DD):',today().toISOString().split('T')[0]);
+  if(!fechaPago)return;
+  const monto=prompt('Monto cobrado (USD):','');
+  if(monto===null)return;
+  let facturas=DB.get('facturas')||[];
+  facturas=facturas.map(f=>f.id===id?{...f,estado:'Pagado',fechaPago,cobrado:Number(monto||0)}:f);
+  DB.set('facturas',facturas);
+  renderFacturas();
+  toast('✅ Factura marcada como pagada');
+}
+
+function deleteFactura(id){
+  if(!confirm('¿Eliminar esta factura?'))return;
+  DB.set('facturas',(DB.get('facturas')||[]).filter(f=>f.id!==id));
+  renderFacturas(); toast('🗑️ Factura eliminada');
+}
+
+// ── MENSAJES DEL DÍA ──────────────────────────────────────────────────────────
+function renderMensajes(){
+  const facturas=DB.get('facturas')||[];
+  const clientes=DB.get('clientes')||[];
+  const plantillas=DB.get('plantillas')||[];
+  const td=today().toISOString().split('T')[0];
+
+  const pNoMora=plantillas.filter(p=>!p.mora);
+  const pMora=plantillas.filter(p=>p.mora);
+
+  let prevCards=[], moraCards=[];
+
+  facturas.filter(f=>f.estado!=='Pagado'&&f.estado!=='Incobrable').forEach(f=>{
+    const cli=clientes.find(c=>c.id===f.clienteId)||{nombre:'?',wa:''};
+    const venc=vencimiento(f);
+    const diasRest=diffDays(venc);
+
+    // Recordatorios pre-vencimiento
+    pNoMora.forEach(p=>{
+      const fechaAviso=addDays(venc,-p.dias);
+      if(fechaAviso===td){
+        const msg=buildMsg(p,f,cli);
+        prevCards.push({f,p,cli,msg,venc});
+      }
+    });
+
+    // Mora post-vencimiento
+    if(diasRest<0){
+      pMora.forEach(p=>{
+        const fechaMora=addDays(venc,p.dias);
+        if(fechaMora===td){
+          const msg=buildMsg(p,f,cli);
+          moraCards.push({f,p,cli,msg,venc});
+        }
+      });
+    }
+  });
+
+  const renderCard=(item,isMora)=>{
+    const {f,p,cli,msg,venc}=item;
+    const diasRest=diffDays(venc);
+    return `
+    <div class="msg-card ${isMora?'mora':''}">
+      <div class="msg-header">
+        <div class="msg-meta">
+          <span class="badge badge-${isMora?'darkred':'blue'}">${p.tipo}</span>
+          <b>${cli.nombre}</b>
+          <span style="color:var(--muted);font-size:12px">FAC ${f.num} · ${fmtMoney(f.monto)}</span>
+        </div>
+        <div>${semaforoBadge(diasRest)}</div>
+      </div>
+      <div class="msg-text">${msg}</div>
+      <div class="msg-actions">
+        <button class="btn btn-wa" onclick="openWa('${waLink(cli.wa,msg)}')">
+          💬 Abrir en WhatsApp
+        </button>
+        <button class="btn btn-ghost copy-btn" onclick="copyText(\`${msg.replace(/`/g,"'")}\`)">
+          📋 Copiar mensaje
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="marcarAvisado(${f.id},'${p.id}')">
+          ✔ Marcar como enviado
+        </button>
+      </div>
+    </div>`;
+  };
+
+  const prevHtml=prevCards.length
+    ? prevCards.map(c=>renderCard(c,false)).join('')
+    : `<div class="empty-state"><span class="empty-icon">🎉</span><h3>Sin recordatorios para hoy</h3><p>No hay facturas que necesiten aviso previo hoy.</p></div>`;
+
+  const moraHtml=moraCards.length
+    ? moraCards.map(c=>renderCard(c,true)).join('')
+    : `<div class="empty-state"><span class="empty-icon">✅</span><h3>Sin avisos de mora para hoy</h3><p>No hay recordatorios de mora programados para hoy.</p></div>`;
+
+  document.getElementById('msgs-prev').innerHTML=prevHtml;
+  document.getElementById('msgs-mora').innerHTML=moraHtml;
+}
+
+function marcarAvisado(facId, plantillaId){
+  const p=DB.get('plantillas').find(x=>x.id===plantillaId);
+  if(!p)return;
+  let label='';
+  if(!p.mora){
+    const map={p7:'Aviso 7d enviado',p5:'Aviso 5d enviado',p3:'Aviso 3d enviado',p0:'Aviso venc. enviado'};
+    label=map[plantillaId]||'Aviso enviado';
+  } else {
+    const map={m7:'Mora 7d enviado',m14:'Mora 14d enviado',m21:'Mora 21d enviado',m28:'Mora 28d+ enviado'};
+    label=map[plantillaId]||'Mora enviado';
+  }
+  let facturas=DB.get('facturas')||[];
+  facturas=facturas.map(f=>f.id===facId?{...f,estado:label}:f);
+  DB.set('facturas',facturas);
+  renderMensajes();
+  toast('✅ Estado actualizado: '+label);
+}
+
+// ── CONFIG / PLANTILLAS ───────────────────────────────────────────────────────
+function renderConfig(){
+  const plantillas=DB.get('plantillas')||[];
+  const noMora=plantillas.filter(p=>!p.mora);
+  const mora=plantillas.filter(p=>p.mora);
+  const renderGroup=(arr,title,cls)=>`
+    <div style="margin-bottom:10px;padding:10px 16px;background:var(--navy);border-radius:8px;color:#fff;font-size:13px;font-weight:700">${title}</div>
+    ${arr.map(p=>`
+    <div class="template-card ${cls}" id="tpl-${p.id}">
+      <h4>${p.tipo} <span style="font-weight:400;color:var(--muted);font-size:11px">(${p.mora?'+':'−'}${p.dias} días del vencimiento)</span></h4>
+      <textarea id="msg-${p.id}" rows="3">${p.msg}</textarea>
+      <div class="tpl-footer">
+        <span class="tpl-vars">Variables: {CLIENTE} {FAC} {MONTO} {FECHA_VENC}</span>
+        <button class="btn btn-ghost btn-sm" onclick="resetPlantilla('${p.id}')">↩ Restaurar</button>
+      </div>
+    </div>`).join('')}`;
+
+  document.getElementById('plantillas-container').innerHTML=
+    renderGroup(noMora,'⏰  Recordatorios pre-vencimiento','') +
+    renderGroup(mora,'🔴  Mensajes de mora post-vencimiento','mora-tpl');
+}
+
+function savePlantillas(){
+  let plantillas=DB.get('plantillas')||[];
+  plantillas=plantillas.map(p=>{
+    const el=document.getElementById('msg-'+p.id);
+    return el?{...p,msg:el.value}:p;
+  });
+  DB.set('plantillas',plantillas);
+  toast('💾 Plantillas guardadas');
+}
+
+function resetPlantilla(id){
+  if(!confirm('¿Restaurar el mensaje por defecto?'))return;
+  const def=defaultPlantillas().find(p=>p.id===id);
+  if(def) document.getElementById('msg-'+id).value=def.msg;
+  toast('↩ Mensaje restaurado');
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); });
+});
+
+// ── Importar Excel ───────────────────────────────────────────────────────────
+function importExcel(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length){ toast('⚠️ El archivo está vacío'); return; }
+
+      // Detectar columnas por nombre (flexible, case-insensitive)
+      const keys = Object.keys(rows[0]);
+      const find = (...names) => keys.find(k => names.some(n => k.toLowerCase().includes(n.toLowerCase())));
+      const colCliente = find('cliente','client','nombre','name');
+      const colFac     = find('fac','factura','invoice','nro','numero','número');
+      const colMonto   = find('monto','amount','total','usd','importe','valor');
+      const colEmision = find('emision','emisión','fecha','date','emission');
+      const colDias    = find('dias','días','credito','crédito','credit','plazo');
+      const colObs     = find('obs','observ','nota','note','comment');
+      const colEstado  = find('estado','status','estatus');
+      const colRif     = find('rif','ci','cedula','cédula','id','identificacion');
+      const colWa      = find('whatsapp','wa','telefono','teléfono','phone','cel','movil','móvil');
+
+      if(!colCliente && !colFac){
+        toast('⚠️ No se encontraron columnas CLIENTE o FAC en el archivo');
+        return;
+      }
+
+      let clientes = DB.get('clientes') || [];
+      let facturas = DB.get('facturas') || [];
+      let cliCreados = 0, cliActualizados = 0, facCreadas = 0, facActualizadas = 0;
+
+      function parseFecha(v){
+        if(!v) return '';
+        if(v instanceof Date) return v.toISOString().split('T')[0];
+        const s = String(v).trim();
+        const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if(m1) return `${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+        const m2 = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if(m2) return `${m2[1]}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
+        return '';
+      }
+
+      rows.forEach(row => {
+        const nombreCli = String(row[colCliente] || '').trim();
+        if(!nombreCli) return;
+
+        // Buscar o crear/actualizar cliente
+        let cli = clientes.find(c => c.nombre.toLowerCase() === nombreCli.toLowerCase());
+        const cliData = {
+          rif: colRif ? String(row[colRif]||'').trim() : '',
+          dias: colDias ? Number(row[colDias]) || 30 : 30,
+          wa: colWa ? limpiarWa(row[colWa]) : '',
+        };
+        if(cli){
+          if(cliData.rif) cli.rif = cliData.rif;
+          if(cliData.wa) cli.wa = cliData.wa;
+          if(colDias && row[colDias]) cli.dias = cliData.dias;
+          cliActualizados++;
+        } else {
+          cli = {
+            id: clientes.length ? Math.max(...clientes.map(c=>c.id)) + 1 : 1,
+            nombre: nombreCli.toUpperCase(),
+            ...cliData, email:'', marcas:'', mercancia:'', ultimaCompra:'', obs:''
+          };
+          clientes.push(cli);
+          cliCreados++;
+        }
+
+        // Crear o actualizar factura
+        const numFac = String(row[colFac] || '').trim();
+        if(!numFac) return;
+
+        const emision = parseFecha(colEmision ? row[colEmision] : '') || today().toISOString().split('T')[0];
+        const diasCred = colDias ? (Number(row[colDias]) || cli.dias || 30) : (cli.dias || 30);
+        const monto = colMonto ? Number(String(row[colMonto]).replace(/[^0-9.,]/g,'').replace(',','.')) || 0 : 0;
+        const estado = colEstado ? String(row[colEstado]||'Pendiente').trim() : 'Pendiente';
+        const obs = colObs ? String(row[colObs]||'').trim() : '';
+
+        const existente = facturas.find(f => f.num === numFac && f.clienteId === cli.id);
+        if(existente){
+          existente.monto = monto || existente.monto;
+          existente.emision = emision || existente.emision;
+          existente.dias = diasCred;
+          if(estado !== 'Pendiente') existente.estado = estado;
+          if(obs) existente.obs = obs;
+          facActualizadas++;
+        } else {
+          facturas.push({
+            id: facturas.length ? Math.max(...facturas.map(f=>f.id)) + 1 : 1,
+            num: numFac, clienteId: cli.id, monto, emision, dias: diasCred,
+            estado, fechaPago:'', cobrado:'', obs
+          });
+          facCreadas++;
+        }
+      });
+
+      DB.set('clientes', clientes);
+      DB.set('facturas', facturas);
+      renderClientes();
+      renderFacturas();
+      renderDashboard();
+
+      let msg = `✅ Importación completada:`;
+      if(facCreadas) msg += ` ${facCreadas} facturas nuevas`;
+      if(facActualizadas) msg += `${facCreadas?',':''} ${facActualizadas} actualizadas`;
+      if(cliCreados) msg += `, ${cliCreados} clientes nuevos`;
+      if(cliActualizados) msg += `, ${cliActualizados} clientes actualizados`;
+      if(!facCreadas&&!facActualizadas&&!cliCreados) msg += ' sin cambios';
+      toast(msg);
+    } catch(err){
+      toast('❌ Error al leer el archivo: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Importar Clientes desde Excel ────────────────────────────────────────────
+function importClientes(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){toast('⚠️ El archivo está vacío');return;}
+
+      const keys=Object.keys(rows[0]);
+      const find=(...names)=>keys.find(k=>names.some(n=>k.toLowerCase().includes(n.toLowerCase())));
+      const colNombre=find('cliente','client','nombre','name','razon','razón');
+      const colRif=find('rif','ci','cedula','cédula','identificacion','id');
+      const colDias=find('dias','días','credito','crédito','credit','plazo');
+      const colWa=find('whatsapp','wa','telefono','teléfono','phone','cel','movil','móvil');
+      const colEmail=find('email','correo','mail');
+      const colMarcas=find('marca','brand');
+      const colMercancia=find('mercancia','mercancía','producto','product');
+      const colUltCompra=find('ultima','última','last','compra');
+      const colObs=find('obs','observ','nota','note','comentario','comment');
+
+      if(!colNombre){toast('⚠️ No se encontró columna CLIENTE o NOMBRE');return;}
+
+      let clientes=DB.get('clientes')||[];
+      let creados=0,actualizados=0;
+
+      rows.forEach(row=>{
+        const nombre=String(row[colNombre]||'').trim().toUpperCase();
+        if(!nombre)return;
+
+        let existente=clientes.find(c=>c.nombre.toUpperCase()===nombre);
+
+        const datos={
+          nombre,
+          rif:colRif?String(row[colRif]||'').trim():'',
+          dias:colDias?Number(row[colDias])||30:30,
+          wa:colWa?limpiarWa(row[colWa]):'',
+          email:colEmail?String(row[colEmail]||'').trim():'',
+          marcas:colMarcas?String(row[colMarcas]||'').trim():'',
+          mercancia:colMercancia?String(row[colMercancia]||'').trim():'',
+          ultimaCompra:'',
+          obs:colObs?String(row[colObs]||'').trim():'',
+        };
+        if(colUltCompra&&row[colUltCompra]){
+          const v=row[colUltCompra];
+          if(v instanceof Date) datos.ultimaCompra=v.toISOString().split('T')[0];
+          else{
+            const s=String(v).trim();
+            const m1=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if(m1) datos.ultimaCompra=`${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+            const m2=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+            if(m2) datos.ultimaCompra=`${m2[1]}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
+          }
+        }
+
+        if(existente){
+          Object.assign(existente,{...datos,nombre:existente.nombre});
+          if(!existente.wa&&datos.wa) existente.wa=datos.wa;
+          actualizados++;
+        } else {
+          clientes.push({...datos,id:clientes.length?Math.max(...clientes.map(c=>c.id))+1:1});
+          creados++;
+        }
+      });
+
+      DB.set('clientes',clientes);
+      renderClientes();
+      let msg=`✅ Importación: ${creados} clientes nuevos`;
+      if(actualizados) msg+=`, ${actualizados} actualizados`;
+      toast(msg);
+    }catch(err){toast('❌ Error: '+err.message);}
+    input.value='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function descargarPlantillaClientes(){
+  const headers=['CLIENTE','RIF','DIAS_CREDITO','WHATSAPP','EMAIL','MARCAS','MERCANCIA','ULTIMA_COMPRA','OBSERVACIONES'];
+  const clientes=DB.get('clientes')||[];
+  const data=clientes.length
+    ? clientes.map(c=>[c.nombre,c.rif||'',c.dias||30,c.wa||'',c.email||'',c.marcas||'',c.mercancia||'',c.ultimaCompra||'',c.obs||''])
+    : [['EJEMPLO S.A.','J-12345678-9',30,'+58 412-1234567','cliente@mail.com','Stanley, Truper','Herramientas, Pinturas','2026-01-15','Cliente preferencial']];
+  const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+  const colWidths=[30,16,14,20,25,20,25,14,30];
+  ws['!cols']=colWidths.map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Clientes');
+  XLSX.writeFile(wb,'Planilla_Clientes_FEBECA.xlsx');
+  toast('📄 Planilla descargada');
+}
+
+function descargarPlantillaFacturas(){
+  const headers=['CLIENTE','FAC','MONTO','EMISION','DIAS_CREDITO','ESTADO','OBSERVACIONES'];
+  const facturas=DB.get('facturas')||[];
+  const clientes=DB.get('clientes')||[];
+  const data=facturas.length
+    ? facturas.map(f=>{
+        const cli=clientes.find(c=>c.id===f.clienteId)||{nombre:''};
+        const emDate=f.emision?new Date(f.emision+'T00:00:00'):null;
+        return [cli.nombre,f.num,f.monto||0,emDate,f.dias||30,f.estado||'Pendiente',f.obs||''];
+      })
+    : [['EJEMPLO S.A.','8409',1250.00,new Date(2026,0,15),30,'Pendiente','Primera factura']];
+  const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+  ws['!cols']=[{wch:30},{wch:12},{wch:14},{wch:14},{wch:14},{wch:20},{wch:30}];
+  // Formatear columnas: FAC como texto, MONTO como número, EMISION como fecha corta
+  const totalRows=data.length+1;
+  for(let r=1;r<totalRows;r++){
+    const facCell=XLSX.utils.encode_cell({r,c:1});
+    if(ws[facCell]){ws[facCell].t='s';ws[facCell].v=String(ws[facCell].v);}
+    const montoCell=XLSX.utils.encode_cell({r,c:2});
+    if(ws[montoCell]) ws[montoCell].z='#,##0.00';
+    const emCell=XLSX.utils.encode_cell({r,c:3});
+    if(ws[emCell]&&ws[emCell].v) ws[emCell].z='DD/MM/YYYY';
+  }
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Facturas');
+  XLSX.writeFile(wb,'Planilla_Facturas_FEBECA.xlsx');
+  toast('📄 Planilla descargada');
+}
+
+// ── DATOS / RESPALDO ─────────────────────────────────────────────────────────
+function renderDatos(){
+  const cl=(DB.get('clientes')||[]).length;
+  const fa=(DB.get('facturas')||[]).length;
+  const pl=(DB.get('plantillas')||[]).length;
+  const el=document.getElementById('export-stats');
+  if(el) el.innerHTML=`📊 <b>${cl}</b> clientes · <b>${fa}</b> facturas · <b>${pl}</b> plantillas`;
+  actualizarSyncStatus();
+}
+
+function exportarDatos(){
+  const data={
+    version:'1.0',
+    exportado:new Date().toISOString(),
+    clientes:DB.get('clientes')||[],
+    facturas:DB.get('facturas')||[],
+    plantillas:DB.get('plantillas')||[]
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const fecha=new Date().toISOString().split('T')[0];
+  a.download=`CobranzaApp_Respaldo_${fecha}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('📤 Respaldo descargado');
+}
+
+function importarDatos(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.clientes&&!data.facturas){toast('⚠️ Archivo no válido');return;}
+      if(!confirm(`¿Importar respaldo?\n\n${(data.clientes||[]).length} clientes\n${(data.facturas||[]).length} facturas\n${(data.plantillas||[]).length} plantillas\n\nEsto REEMPLAZARÁ todos los datos actuales.`))return;
+      if(data.clientes) DB.set('clientes',data.clientes);
+      if(data.facturas) DB.set('facturas',data.facturas);
+      if(data.plantillas) DB.set('plantillas',data.plantillas);
+      renderDatos();
+      renderDashboard();
+      toast('✅ Datos importados correctamente');
+    }catch(err){toast('❌ Error: '+err.message);}
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+initData();
+
+// Fecha hoy en topbar
+const now=new Date();
+document.getElementById('today-badge').textContent=
+  now.toLocaleDateString('es-VE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// Arrancar en dashboard
+renderDashboard();
+
+// ── PWA Service Worker ───────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
