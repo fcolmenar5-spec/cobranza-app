@@ -320,6 +320,7 @@ tbody td{padding:10px 14px;vertical-align:middle}
           <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(this)">
           <button class="btn btn-ghost" onclick="descargarPlantillaFacturas()">📄 Descargar planilla</button>
           <button class="btn btn-green" onclick="document.getElementById('excel-input').click()">📥 Importar Excel</button>
+          <button class="btn btn-wa" onclick="openCobroMasivo()">💬 Cobro masivo</button>
           <button class="btn btn-primary" onclick="openModalFactura()">➕ Nueva factura</button>
         </div>
       </div>
@@ -489,6 +490,21 @@ tbody td{padding:10px 14px;vertical-align:middle}
 
 <!-- Toast -->
 <div id="toast"><span id="toast-msg"></span></div>
+
+<!-- Modal Cobro Masivo -->
+<div class="modal-overlay" id="modal-cobro-masivo">
+  <div class="modal" style="width:480px">
+    <h3>💬 Cobro Masivo</h3>
+    <div class="form-grid">
+      <div class="form-group full"><label>Selecciona el cliente *</label><select id="cobro-masivo-cli" style="width:100%"></select></div>
+      <div class="form-group full" id="cobro-masivo-preview" style="font-size:12px;color:var(--muted);padding:10px;background:var(--sky);border-radius:7px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cobro-masivo')">Cancelar</button>
+      <button class="btn btn-wa" onclick="ejecutarCobroMasivo()">💬 Enviar cobro</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal Detalle Cliente -->
 <div class="modal-overlay" id="modal-detalle-cli">
@@ -902,7 +918,6 @@ function renderClientes(){
       <td>${c.ultimaCompra?fmtDate(c.ultimaCompra):'—'}</td>
       <td>${c.wa?`<a href="https://wa.me/${c.wa.replace(/\D/g,'')}" target="_blank" style="color:var(--green);font-weight:600">${c.wa}</a>`:'—'}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-wa btn-sm" title="Cobro masivo: enviar todas las vencidas" onclick="cobroMasivo(${c.id})">💬 Cobro</button>
         <button class="btn-icon" title="Ver detalle" onclick="openDetalleCliente(${c.id})">👁️</button>
         <button class="btn-icon" title="Editar" onclick="openModalCliente(${c.id})">✏️</button>
         <button class="btn-icon" title="Eliminar" onclick="deleteCliente(${c.id})">🗑️</button>
@@ -1151,6 +1166,41 @@ function enviarMensajeFactura(id){
     renderFacturas();
     toast('💬 WhatsApp abierto · Estado: '+nuevoEstado);
   }
+}
+
+function openCobroMasivo(){
+  const clientes=(DB.get('clientes')||[]).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const facturas=DB.get('facturas')||[];
+  const sel=document.getElementById('cobro-masivo-cli');
+  const opciones=clientes.map(c=>{
+    const vencidas=facturas.filter(f=>f.clienteId===c.id&&f.estado!=='Pagado'&&f.estado!=='Incobrable'&&diffDays(vencimiento(f))<0);
+    if(!vencidas.length)return '';
+    const total=vencidas.reduce((s,f)=>s+Number(f.monto||0),0);
+    return `<option value="${c.id}">${c.nombre} — ${vencidas.length} vencidas · ${fmtMoney(total)}</option>`;
+  }).filter(Boolean).join('');
+  if(!opciones){toast('ℹ️ No hay clientes con facturas vencidas');return;}
+  sel.innerHTML=opciones;
+  actualizarPreviewCobro();
+  sel.onchange=actualizarPreviewCobro;
+  document.getElementById('modal-cobro-masivo').classList.add('open');
+}
+
+function actualizarPreviewCobro(){
+  const clienteId=Number(document.getElementById('cobro-masivo-cli').value);
+  const facturas=DB.get('facturas')||[];
+  const vencidas=facturas.filter(f=>f.clienteId===clienteId&&f.estado!=='Pagado'&&f.estado!=='Incobrable'&&diffDays(vencimiento(f))<0);
+  const el=document.getElementById('cobro-masivo-preview');
+  if(!vencidas.length){el.innerHTML='Sin facturas vencidas';return;}
+  el.innerHTML='<b>Facturas a cobrar:</b><br>'+vencidas.map(f=>{
+    const dias=Math.abs(diffDays(vencimiento(f)));
+    return `• FAC ${f.num} — ${fmtMoney(f.monto)} (${dias}d mora)`;
+  }).join('<br>');
+}
+
+function ejecutarCobroMasivo(){
+  const clienteId=Number(document.getElementById('cobro-masivo-cli').value);
+  closeModal('modal-cobro-masivo');
+  cobroMasivo(clienteId);
 }
 
 function cobroMasivo(clienteId){
