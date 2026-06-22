@@ -11,6 +11,8 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='30' fill='%231F4E79'/><text x='90' y='125' text-anchor='middle' font-size='110'>💼</text></svg>">
 <title>FEBECA — App de Cobranza</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
 /* ── Reset & Base ─────────────────────────────────────── */
 *{margin:0;padding:0;box-sizing:border-box}
@@ -389,15 +391,14 @@ tbody td{padding:10px 14px;vertical-align:middle}
     <div class="view" id="view-datos">
       <div class="section-header"><h2>Respaldo y Sincronización</h2></div>
 
-      <!-- Sync OneDrive -->
+      <!-- Sync Firebase -->
       <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;border-left:5px solid var(--navy);margin-bottom:20px;max-width:700px">
-        <h3 style="font-size:15px;color:var(--navy);margin-bottom:8px">🔄 Sincronización automática con OneDrive</h3>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Vincula la carpeta de la app para guardar y leer los datos automáticamente. Funciona en PC y celular con la misma carpeta de OneDrive.</p>
+        <h3 style="font-size:15px;color:var(--navy);margin-bottom:8px">☁️ Sincronización automática (Firebase)</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Los datos se sincronizan automáticamente entre todos tus dispositivos en tiempo real. Cualquier cambio en la PC aparece al instante en el celular y viceversa.</p>
         <div id="sync-status" style="font-size:13px;padding:10px;background:var(--sky);border-radius:7px;margin-bottom:14px"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="vincularCarpeta()">📂 Vincular carpeta</button>
-          <button class="btn btn-green" onclick="guardarEnCarpeta()">💾 Guardar ahora</button>
-          <button class="btn btn-ghost" onclick="cargarDesdeCarpeta()">🔄 Cargar datos</button>
+          <button class="btn btn-green" onclick="subirAFirebase(false)">☁️ Subir datos ahora</button>
+          <button class="btn btn-primary" onclick="bajarDeFirebase()">⬇️ Descargar de la nube</button>
         </div>
       </div>
 
@@ -519,152 +520,91 @@ tbody td{padding:10px 14px;vertical-align:middle}
 
 <!-- ══ SCRIPT ══════════════════════════════════════════════════════════════════ -->
 <script>
-// ── Storage ──────────────────────────────────────────────────────────────────
-let _dirHandle = null;
+// ── Firebase ─────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyC0Px86CtXYovZTdsg1-Egh_sstNlj-Zgg",
+  authDomain: "appcobranza-53dcd.firebaseapp.com",
+  databaseURL: "https://appcobranza-53dcd-default-rtdb.firebaseio.com",
+  projectId: "appcobranza-53dcd",
+  storageBucket: "appcobranza-53dcd.firebasestorage.app",
+  messagingSenderId: "779698507319",
+  appId: "1:779698507319:web:922a14109f3792b8cbb9b2"
+};
+firebase.initializeApp(firebaseConfig);
+const fbDB = firebase.database();
+let _firebaseReady = false;
 let _syncTimer = null;
+
+// ── Storage (localStorage + Firebase sync) ───────────────────────────────────
 const DB = {
   get: k => JSON.parse(localStorage.getItem('cobApp_'+k)||'null'),
   set: (k,v) => {
     localStorage.setItem('cobApp_'+k, JSON.stringify(v));
-    // Auto-guardar en carpeta vinculada (con debounce)
-    if(_dirHandle){
-      clearTimeout(_syncTimer);
-      _syncTimer = setTimeout(()=> guardarEnCarpeta(true), 1500);
-    }
+    // Auto-sync a Firebase con debounce
+    clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(()=> subirAFirebase(true), 1000);
   },
 };
 
-// ── IndexedDB para persistir el handle de carpeta ────────────────────────────
-function abrirIDB(){
-  return new Promise((res,rej)=>{
-    const req=indexedDB.open('cobApp_sync',1);
-    req.onupgradeneeded=()=>req.result.createObjectStore('handles');
-    req.onsuccess=()=>res(req.result);
-    req.onerror=()=>rej(req.error);
-  });
-}
-async function guardarHandle(handle){
-  const db=await abrirIDB();
-  const tx=db.transaction('handles','readwrite');
-  tx.objectStore('handles').put(handle,'dirHandle');
-}
-async function recuperarHandle(){
-  const db=await abrirIDB();
-  return new Promise(res=>{
-    const tx=db.transaction('handles','readonly');
-    const req=tx.objectStore('handles').get('dirHandle');
-    req.onsuccess=()=>res(req.result||null);
-    req.onerror=()=>res(null);
-  });
-}
-
-// ── Sincronización con carpeta (OneDrive) ────────────────────────────────────
-async function vincularCarpeta(){
-  if(!window.showDirectoryPicker){
-    toast('⚠️ Tu navegador no soporta esta función. Usa Chrome o Edge.');
-    return;
-  }
-  try{
-    _dirHandle = await window.showDirectoryPicker({mode:'readwrite'});
-    await guardarHandle(_dirHandle);
-    actualizarSyncStatus();
-    toast('✅ Carpeta vinculada correctamente');
-  }catch(e){
-    if(e.name!=='AbortError') toast('❌ Error: '+e.message);
-  }
-}
-
-async function guardarEnCarpeta(silencioso){
-  if(!_dirHandle){
-    if(!silencioso) toast('⚠️ Primero vincula una carpeta');
-    return;
-  }
-  try{
-    const perm = await _dirHandle.queryPermission({mode:'readwrite'});
-    if(perm!=='granted'){
-      const req = await _dirHandle.requestPermission({mode:'readwrite'});
-      if(req!=='granted'){toast('⚠️ Permiso denegado');return;}
-    }
-    const data={
-      version:'1.0',
-      ultimaSync:new Date().toISOString(),
-      clientes:DB.get('clientes')||[],
-      facturas:DB.get('facturas')||[],
-      plantillas:DB.get('plantillas')||[]
-    };
-    const fileHandle = await _dirHandle.getFileHandle('datos.json',{create:true});
-    const writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify(data,null,2));
-    await writable.close();
+function subirAFirebase(silencioso){
+  const data={
+    clientes:DB.get('clientes')||[],
+    facturas:DB.get('facturas')||[],
+    plantillas:DB.get('plantillas')||[],
+    ultimaSync:new Date().toISOString()
+  };
+  fbDB.ref('datos').set(data).then(()=>{
     localStorage.setItem('cobApp_lastSync',data.ultimaSync);
-    if(!silencioso){
-      actualizarSyncStatus();
-      toast('💾 Datos guardados en OneDrive');
-    }
-  }catch(e){
-    if(!silencioso) toast('❌ Error al guardar: '+e.message);
-  }
+    if(!silencioso) toast('☁️ Datos sincronizados');
+    actualizarSyncStatus();
+  }).catch(e=>{
+    if(!silencioso) toast('❌ Error sync: '+e.message);
+  });
 }
 
-async function cargarDesdeCarpeta(){
-  if(!_dirHandle){toast('⚠️ Primero vincula una carpeta');return;}
-  try{
-    const perm = await _dirHandle.queryPermission({mode:'read'});
-    if(perm!=='granted'){
-      const req = await _dirHandle.requestPermission({mode:'read'});
-      if(req!=='granted'){toast('⚠️ Permiso denegado');return;}
-    }
-    const fileHandle = await _dirHandle.getFileHandle('datos.json');
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if(!data.clientes&&!data.facturas){toast('⚠️ Archivo no válido');return;}
-    const cl=(data.clientes||[]).length, fa=(data.facturas||[]).length;
-    if(!confirm(`¿Cargar datos desde OneDrive?\n\n${cl} clientes, ${fa} facturas\n\nEsto reemplazará los datos actuales.`))return;
-    if(data.clientes) DB.set('clientes',data.clientes);
-    if(data.facturas) DB.set('facturas',data.facturas);
-    if(data.plantillas) DB.set('plantillas',data.plantillas);
+function bajarDeFirebase(){
+  fbDB.ref('datos').once('value').then(snap=>{
+    const data=snap.val();
+    if(!data){toast('ℹ️ No hay datos en la nube aún');return;}
+    if(data.clientes) localStorage.setItem('cobApp_clientes',JSON.stringify(data.clientes));
+    if(data.facturas) localStorage.setItem('cobApp_facturas',JSON.stringify(data.facturas));
+    if(data.plantillas) localStorage.setItem('cobApp_plantillas',JSON.stringify(data.plantillas));
     localStorage.setItem('cobApp_lastSync',data.ultimaSync||new Date().toISOString());
     actualizarSyncStatus();
     renderDashboard();
-    toast('✅ Datos cargados desde OneDrive');
-  }catch(e){
-    if(e.name==='NotFoundError') toast('ℹ️ No hay archivo datos.json en la carpeta. Guarda primero desde otro dispositivo.');
-    else toast('❌ Error: '+e.message);
-  }
+    renderClientes();
+    renderFacturas();
+    toast('✅ Datos descargados de la nube');
+  }).catch(e=>toast('❌ Error: '+e.message));
 }
+
+// Escuchar cambios en tiempo real
+fbDB.ref('datos').on('value', snap=>{
+  if(!_firebaseReady){_firebaseReady=true;return;}
+  const data=snap.val();
+  if(!data)return;
+  const remoteSync=data.ultimaSync||'';
+  const localSync=localStorage.getItem('cobApp_lastSync')||'';
+  if(remoteSync>localSync){
+    if(data.clientes) localStorage.setItem('cobApp_clientes',JSON.stringify(data.clientes));
+    if(data.facturas) localStorage.setItem('cobApp_facturas',JSON.stringify(data.facturas));
+    if(data.plantillas) localStorage.setItem('cobApp_plantillas',JSON.stringify(data.plantillas));
+    localStorage.setItem('cobApp_lastSync',remoteSync);
+    renderDashboard();
+    renderClientes();
+    renderFacturas();
+    actualizarSyncStatus();
+    toast('🔄 Datos actualizados desde otro dispositivo');
+  }
+});
 
 function actualizarSyncStatus(){
   const el=document.getElementById('sync-status');
   if(!el)return;
   const lastSync=localStorage.getItem('cobApp_lastSync');
-  if(_dirHandle){
-    const syncText=lastSync?`Última sincronización: ${new Date(lastSync).toLocaleString('es-VE')}`:'Sin sincronizar aún';
-    el.innerHTML=`🟢 <b>Carpeta vinculada</b> · ${syncText} · <span style="color:var(--muted)">Auto-guardado activo</span>`;
-  } else {
-    el.innerHTML='🔴 <b>Sin vincular</b> — presiona "Vincular carpeta" y selecciona la carpeta CobranzaApp en OneDrive';
-  }
+  const syncText=lastSync?`Última sincronización: ${new Date(lastSync).toLocaleString('es-VE')}`:'Sin sincronizar aún';
+  el.innerHTML=`☁️ <b>Firebase conectado</b> · ${syncText} · <span style="color:var(--muted)">Sync automático activo</span>`;
 }
-
-// Intentar recuperar handle al iniciar
-async function initSync(){
-  try{
-    const handle = await recuperarHandle();
-    if(handle){
-      const perm = await handle.queryPermission({mode:'readwrite'});
-      if(perm==='granted'){
-        _dirHandle=handle;
-        actualizarSyncStatus();
-      } else {
-        _dirHandle=handle;
-        actualizarSyncStatus();
-      }
-    } else {
-      actualizarSyncStatus();
-    }
-  }catch(e){ actualizarSyncStatus(); }
-}
-initSync();
 
 // ── Initial Data ─────────────────────────────────────────────────────────────
 function initData(){
