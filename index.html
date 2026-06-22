@@ -380,6 +380,7 @@ tbody td{padding:10px 14px;vertical-align:middle}
     <!-- ── CONFIG / PLANTILLAS ─────────────────────────────────────────────── -->
     <div class="view" id="view-config">
       <div class="section-header"><h2>Plantillas de Mensajes</h2>
+        <button class="btn btn-red" onclick="resetTodasPlantillas()">↩ Restaurar todas</button>
         <button class="btn btn-primary" onclick="savePlantillas()">💾 Guardar cambios</button>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:18px">Variables disponibles: <code>{CLIENTE}</code> <code>{FAC}</code> <code>{MONTO}</code> <code>{FECHA_VENC}</code> <code>{DIAS}</code> <code>{DIAS_MORA}</code></p>
@@ -1287,6 +1288,13 @@ function savePlantillas(){
   });
   DB.set('plantillas',plantillas);
   toast('💾 Plantillas guardadas');
+}
+
+function resetTodasPlantillas(){
+  if(!confirm('¿Restaurar TODAS las plantillas a los mensajes por defecto?'))return;
+  DB.set('plantillas',defaultPlantillas());
+  renderConfig();
+  toast('↩ Todas las plantillas restauradas');
 }
 
 function resetPlantilla(id){
