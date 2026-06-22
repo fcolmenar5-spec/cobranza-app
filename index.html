@@ -1128,7 +1128,8 @@ function cobroMasivo(clienteId){
 
   if(!vencidas.length&&!porVencer.length){toast('ℹ️ Este cliente no tiene facturas activas');return;}
 
-  let msg=`Estimado/a ${cli.nombre},\n\nLe enviamos un resumen de su cuenta:\n`;
+  const tpl=DB.get('cobro_masivo')||defaultCobroMasivo();
+  let msg=tpl.header.replace(/{CLIENTE}/g, cli.nombre)+'\n';
 
   if(vencidas.length){
     const totalVencidas=vencidas.reduce((s,f)=>s+Number(f.monto||0),0);
@@ -1149,7 +1150,7 @@ function cobroMasivo(clienteId){
     msg+=`\n⏰ *FACTURAS POR VENCER* (${porVencer.length}) — Total: ${fmtMoney(totalPorVencer)}\n${detallePV}\n`;
   }
 
-  msg+=`\nPara ayudarnos a mantener su cuenta al día y garantizar que sus próximos despachos fluyan sin retrasos, le invitamos a revisar sus facturas pendientes. ¡Agradecemos su apoyo! — FEBECA`;
+  msg+='\n'+tpl.footer.replace(/{CLIENTE}/g, cli.nombre);
 
   openWa(waLink(cli.wa, msg));
 
@@ -1292,9 +1293,27 @@ function renderConfig(){
       </div>
     </div>`).join('')}`;
 
+  const masivo = DB.get('cobro_masivo') || defaultCobroMasivo();
   document.getElementById('plantillas-container').innerHTML=
     renderGroup(noMora,'⏰  Recordatorios pre-vencimiento','') +
-    renderGroup(mora,'🔴  Mensajes de mora post-vencimiento','mora-tpl');
+    renderGroup(mora,'🔴  Mensajes de mora post-vencimiento','mora-tpl') +
+    `<div style="margin-top:10px;padding:10px 16px;background:var(--navy);border-radius:8px;color:#fff;font-size:13px;font-weight:700">📋  Mensaje de cobro masivo</div>
+    <div class="template-card" style="border-left-color:var(--green)">
+      <h4>Encabezado <span style="font-weight:400;color:var(--muted);font-size:11px">(inicio del mensaje)</span></h4>
+      <textarea id="masivo-header" rows="2">${masivo.header}</textarea>
+    </div>
+    <div class="template-card" style="border-left-color:var(--green)">
+      <h4>Cierre <span style="font-weight:400;color:var(--muted);font-size:11px">(final del mensaje)</span></h4>
+      <textarea id="masivo-footer" rows="3">${masivo.footer}</textarea>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px">El detalle de facturas vencidas y por vencer se genera automáticamente entre el encabezado y el cierre. Variable disponible: <code>{CLIENTE}</code></p>`;
+}
+
+function defaultCobroMasivo(){
+  return {
+    header:'Estimado/a {CLIENTE},\n\nLe enviamos un resumen de su cuenta:',
+    footer:'Para ayudarnos a mantener su cuenta al día y garantizar que sus próximos despachos fluyan sin retrasos, le invitamos a revisar sus facturas pendientes. ¡Agradecemos su apoyo! — FEBECA'
+  };
 }
 
 function savePlantillas(){
@@ -1304,12 +1323,17 @@ function savePlantillas(){
     return el?{...p,msg:el.value}:p;
   });
   DB.set('plantillas',plantillas);
+  // Guardar cobro masivo
+  const h=document.getElementById('masivo-header');
+  const f=document.getElementById('masivo-footer');
+  if(h&&f) DB.set('cobro_masivo',{header:h.value,footer:f.value});
   toast('💾 Plantillas guardadas');
 }
 
 function resetTodasPlantillas(){
   if(!confirm('¿Restaurar TODAS las plantillas a los mensajes por defecto?'))return;
   DB.set('plantillas',defaultPlantillas());
+  DB.set('cobro_masivo',defaultCobroMasivo());
   renderConfig();
   toast('↩ Todas las plantillas restauradas');
 }
