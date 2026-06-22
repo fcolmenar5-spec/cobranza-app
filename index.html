@@ -823,8 +823,9 @@ function renderClientes(){
   const total=(DB.get('clientes')||[]).length;
   const clientes=(DB.get('clientes')||[]).filter(c=>!q||c.nombre.toLowerCase().includes(q)||(c.rif||'').toLowerCase().includes(q));
   document.getElementById('contador-clientes').textContent=q?`${clientes.length} de ${total}`:total;
+  // Siempre ordenar A→Z por defecto
+  clientes.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const sortVal=(document.getElementById('sort-clientes')||{}).value||'';
-  if(sortVal==='az')  clientes.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   if(sortVal==='za')  clientes.sort((a,b)=>b.nombre.localeCompare(a.nombre));
   if(sortVal==='credito') clientes.sort((a,b)=>(a.dias||30)-(b.dias||30));
   if(sortVal==='compra')  clientes.sort((a,b)=>(b.ultimaCompra||'').localeCompare(a.ultimaCompra||''));
