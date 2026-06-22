@@ -800,8 +800,6 @@ function renderDashboard(){
     {label:'Vencen hoy',value:hoy0.length,sub:'requieren atención hoy',icon:'🔔',color:'orange'},
     {label:'Vencen en ≤ 3 días',value:prox3.length,sub:'urgentes',icon:'⚠️',color:'orange'},
     {label:'Avisos a enviar HOY',value:avisosHoy.length,sub:'mensajes pendientes',icon:'📲',color:'purple'},
-    {label:'Facturas cobradas',value:pagadas.length,sub:'completadas',icon:'✅',color:'green'},
-    {label:'Total cobrado',value:fmtMoney(cobrado),sub:'USD recuperado',icon:'🏆',color:'green',raw:true},
   ];
   document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
     <div class="kpi-card ${k.color}">
