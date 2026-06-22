@@ -1122,17 +1122,34 @@ function cobroMasivo(clienteId){
   if(!cli.wa){toast('⚠️ Este cliente no tiene WhatsApp registrado');return;}
 
   let facturas=DB.get('facturas')||[];
-  const vencidas=facturas.filter(f=>f.clienteId===clienteId&&f.estado!=='Pagado'&&f.estado!=='Incobrable'&&diffDays(vencimiento(f))<0);
+  const activas=facturas.filter(f=>f.clienteId===clienteId&&f.estado!=='Pagado'&&f.estado!=='Incobrable');
+  const vencidas=activas.filter(f=>diffDays(vencimiento(f))<0);
+  const porVencer=activas.filter(f=>diffDays(vencimiento(f))>=0);
 
-  if(!vencidas.length){toast('ℹ️ Este cliente no tiene facturas vencidas');return;}
+  if(!vencidas.length&&!porVencer.length){toast('ℹ️ Este cliente no tiene facturas activas');return;}
 
-  const totalDeuda=vencidas.reduce((s,f)=>s+Number(f.monto||0),0);
-  const detalle=vencidas.map(f=>{
-    const dias=Math.abs(diffDays(vencimiento(f)));
-    return `• Factura que termina en ${f.num} — ${fmtMoney(f.monto)} (${dias} días de mora)`;
-  }).join('\n');
+  let msg=`Estimado/a ${cli.nombre},\n\nLe enviamos un resumen de su cuenta:\n`;
 
-  const msg=`Estimado/a ${cli.nombre},\n\nLe informamos que tiene ${vencidas.length} factura(s) vencida(s) por un total de ${fmtMoney(totalDeuda)}:\n\n${detalle}\n\nPara ayudarnos a mantener su cuenta al día y garantizar que sus próximos despachos fluyan sin retrasos, le invitamos a revisar sus facturas pendientes. ¡Agradecemos su apoyo! — FEBECA`;
+  if(vencidas.length){
+    const totalVencidas=vencidas.reduce((s,f)=>s+Number(f.monto||0),0);
+    const detalleVenc=vencidas.map(f=>{
+      const dias=Math.abs(diffDays(vencimiento(f)));
+      return `• Factura que termina en ${f.num} — ${fmtMoney(f.monto)} (vencida hace ${dias} días)`;
+    }).join('\n');
+    msg+=`\n🔴 *FACTURAS VENCIDAS* (${vencidas.length}) — Total: ${fmtMoney(totalVencidas)}\n${detalleVenc}\n`;
+  }
+
+  if(porVencer.length){
+    const totalPorVencer=porVencer.reduce((s,f)=>s+Number(f.monto||0),0);
+    const detallePV=porVencer.map(f=>{
+      const dias=diffDays(vencimiento(f));
+      const texto=dias===0?'vence HOY':`vence en ${dias} días`;
+      return `• Factura que termina en ${f.num} — ${fmtMoney(f.monto)} (${texto})`;
+    }).join('\n');
+    msg+=`\n⏰ *FACTURAS POR VENCER* (${porVencer.length}) — Total: ${fmtMoney(totalPorVencer)}\n${detallePV}\n`;
+  }
+
+  msg+=`\nPara ayudarnos a mantener su cuenta al día y garantizar que sus próximos despachos fluyan sin retrasos, le invitamos a revisar sus facturas pendientes. ¡Agradecemos su apoyo! — FEBECA`;
 
   openWa(waLink(cli.wa, msg));
 
@@ -1141,7 +1158,7 @@ function cobroMasivo(clienteId){
   DB.set('facturas',facturas);
   renderFacturas();
   renderClientes();
-  toast(`💬 Cobro masivo enviado: ${vencidas.length} facturas de ${cli.nombre}`);
+  toast(`💬 Cobro masivo enviado: ${vencidas.length} vencidas + ${porVencer.length} por vencer de ${cli.nombre}`);
 }
 
 function marcarPagado(id){
