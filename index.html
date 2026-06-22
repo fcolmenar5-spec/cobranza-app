@@ -607,26 +607,8 @@ function actualizarSyncStatus(){
 
 // ── Initial Data ─────────────────────────────────────────────────────────────
 function initData(){
-  if(!DB.get('clientes')) DB.set('clientes',[
-    {id:1,nombre:'DISMATECO',rif:'J-12345678-9',dias:30,wa:'+58 412-1234567',email:'',obs:''},
-    {id:2,nombre:'FERSIL',rif:'J-98765432-1',dias:30,wa:'+58 414-7654321',email:'',obs:''},
-    {id:3,nombre:'FERREMALL 2023',rif:'J-11223344-5',dias:45,wa:'+58 424-1122334',email:'',obs:'Crédito especial'},
-    {id:4,nombre:'INVERSIONES FERQUINCA',rif:'J-55667788-9',dias:60,wa:'+58 416-5566778',email:'',obs:''},
-    {id:5,nombre:'CONSTRUFASIL ARAGUA',rif:'J-33445566-7',dias:30,wa:'+58 412-3344556',email:'',obs:''},
-  ]);
-  if(!DB.get('facturas')){
-    const today = new Date(); today.setHours(0,0,0,0);
-    const d = (offset) => { const x=new Date(today); x.setDate(x.getDate()+offset); return x.toISOString().split('T')[0]; };
-    DB.set('facturas',[
-      {id:1,num:'8409',clienteId:1,monto:1250.00,emision:d(-43),dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-      {id:2,num:'8859',clienteId:2,monto:870.50, emision:d(-43),dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-      {id:3,num:'3345',clienteId:3,monto:2100.00,emision:d(-12),dias:45,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-      {id:4,num:'3359',clienteId:4,monto:3400.75,emision:d(-8), dias:60,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-      {id:5,num:'3558',clienteId:5,monto:560.00, emision:d(-12),dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-      {id:6,num:'9001',clienteId:1,monto:1800.00,emision:d(3),  dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-      {id:7,num:'9002',clienteId:2,monto:420.25, emision:d(-1), dias:30,estado:'Pendiente',fechaPago:'',cobrado:'',obs:''},
-    ]);
-  }
+  if(!DB.get('clientes')) DB.set('clientes',[]);
+  if(!DB.get('facturas')) DB.set('facturas',[]);
   if(!DB.get('plantillas')) DB.set('plantillas', defaultPlantillas());
 }
 
