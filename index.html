@@ -1105,7 +1105,7 @@ function actualizarPreviewCobro(){
   if(!vencidas.length){el.innerHTML='Sin facturas vencidas';return;}
   el.innerHTML='<b>Facturas a cobrar:</b><br>'+vencidas.map(f=>{
     const dias=Math.abs(diffDays(vencimiento(f)));
-    return `• FAC ${f.num} — ${fmtMoney(f.monto)} (${dias}d mora)`;
+    return `• Factura que termina en ${f.num} — ${fmtMoney(f.monto)} (${dias}d mora)`;
   }).join('<br>');
 }
 
@@ -1129,7 +1129,7 @@ function cobroMasivo(clienteId){
   const totalDeuda=vencidas.reduce((s,f)=>s+Number(f.monto||0),0);
   const detalle=vencidas.map(f=>{
     const dias=Math.abs(diffDays(vencimiento(f)));
-    return `• FAC ${f.num} — ${fmtMoney(f.monto)} (${dias} días de mora)`;
+    return `• Factura que termina en ${f.num} — ${fmtMoney(f.monto)} (${dias} días de mora)`;
   }).join('\n');
 
   const msg=`Estimado/a ${cli.nombre},\n\nLe informamos que tiene ${vencidas.length} factura(s) vencida(s) por un total de ${fmtMoney(totalDeuda)}:\n\n${detalle}\n\nLe agradecemos regularizar su situación a la brevedad.\n— FEBECA`;
