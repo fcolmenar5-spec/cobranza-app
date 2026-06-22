@@ -614,22 +614,16 @@ function initData(){
 
 function defaultPlantillas(){
   return [
-    {id:'p7',tipo:'⏰ Recordatorio 7 días',dias:7,mora:false,
+    {id:'p10',tipo:'⏰ Recordatorio 10 días',dias:10,mora:false,
      msg:'Estimado/a {CLIENTE}, le recordamos que la factura N° {FAC} por {MONTO} vence el {FECHA_VENC} (en {DIAS} días). Por favor planifique su pago. — FEBECA'},
     {id:'p5',tipo:'⏰ Recordatorio 5 días',dias:5,mora:false,
      msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} vence en {DIAS} días, el {FECHA_VENC}. Le agradecemos gestionar el pago. — FEBECA'},
-    {id:'p3',tipo:'⚠️ Recordatorio 3 días',dias:3,mora:false,
-     msg:'Estimado/a {CLIENTE}, AVISO: la factura N° {FAC} por {MONTO} vence en {DIAS} días ({FECHA_VENC}). Realice su pago para evitar recargos. — FEBECA'},
-    {id:'p0',tipo:'🔴 Último día de vencimiento',dias:0,mora:false,
-     msg:'Estimado/a {CLIENTE}, HOY VENCE la factura N° {FAC} por {MONTO}. Realice el pago hoy para evitar intereses de mora. — FEBECA'},
+    {id:'p0',tipo:'🔴 Día de vencimiento (cobro)',dias:0,mora:false,
+     msg:'Estimado/a {CLIENTE}, HOY VENCE la factura N° {FAC} por {MONTO}. Le solicitamos realizar el pago el día de hoy para evitar intereses de mora. — FEBECA'},
     {id:'m7',tipo:'🔴 Mora +7 días',dias:7,mora:true,
      msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} venció el {FECHA_VENC} y tiene {DIAS_MORA} días de mora. Regularice su pago a la brevedad. — FEBECA'},
-    {id:'m14',tipo:'🔴 Mora +14 días',dias:14,mora:true,
-     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} acumula {DIAS_MORA} días de mora (venció el {FECHA_VENC}). Comuníquese con su vendedor para acordar pago. — FEBECA'},
-    {id:'m21',tipo:'⚠️ Mora +21 días',dias:21,mora:true,
-     msg:'Estimado/a {CLIENTE}, AVISO URGENTE: la factura N° {FAC} por {MONTO} lleva {DIAS_MORA} días vencida ({FECHA_VENC}). Contáctenos HOY. — FEBECA'},
-    {id:'m28',tipo:'🚨 Mora +28 días',dias:28,mora:true,
-     msg:'Estimado/a {CLIENTE}, ÚLTIMO AVISO: la factura N° {FAC} por {MONTO} lleva {DIAS_MORA} días vencida desde el {FECHA_VENC}. Procederemos con cobranza formal. — FEBECA'},
+    {id:'m45',tipo:'🚨 Mora +45 días',dias:45,mora:true,
+     msg:'Estimado/a {CLIENTE}, AVISO IMPORTANTE: la factura N° {FAC} por {MONTO} lleva {DIAS_MORA} días vencida desde el {FECHA_VENC}. De no recibir el pago procederemos con cobranza formal. — FEBECA'},
   ];
 }
 
@@ -1049,29 +1043,21 @@ function enviarMensajeFactura(id){
   const cli = clientes.find(c=>c.id===f.clienteId)||{nombre:'?',wa:''};
   if(!cli.wa){ toast('⚠️ Este cliente no tiene WhatsApp registrado'); return; }
 
-  // Calcular días exactos al momento del clic (hoy a medianoche vs fecha vencimiento)
+  // Calcular días exactos al momento del clic
   const venc = vencimiento(f);
   const dias = diffDays(venc); // positivo = faltan días, negativo = mora
 
   let plantilla;
-  if(dias > 7) {
-    // Aún fuera de ventana de recordatorios → usar aviso 7d igual
-    plantilla = plantillas.find(p=>p.id==='p7');
-  } else if(dias >= 6) {
-    plantilla = plantillas.find(p=>p.id==='p7');
-  } else if(dias >= 4) {
-    plantilla = plantillas.find(p=>p.id==='p5');
+  if(dias > 5) {
+    plantilla = plantillas.find(p=>p.id==='p10');
   } else if(dias >= 1) {
-    plantilla = plantillas.find(p=>p.id==='p3');
+    plantilla = plantillas.find(p=>p.id==='p5');
   } else if(dias === 0) {
     plantilla = plantillas.find(p=>p.id==='p0');
   } else {
-    // Mora: días vencida acumulados
     const mora = Math.abs(dias);
-    if(mora <= 7)       plantilla = plantillas.find(p=>p.id==='m7');
-    else if(mora <= 14) plantilla = plantillas.find(p=>p.id==='m14');
-    else if(mora <= 21) plantilla = plantillas.find(p=>p.id==='m21');
-    else                plantilla = plantillas.find(p=>p.id==='m28');
+    if(mora <= 44)  plantilla = plantillas.find(p=>p.id==='m7');
+    else            plantilla = plantillas.find(p=>p.id==='m45');
   }
 
   if(!plantilla){ toast('⚠️ No se encontró plantilla para esta factura'); return; }
@@ -1082,9 +1068,8 @@ function enviarMensajeFactura(id){
 
   // Actualizar estado automáticamente
   const estadoMap = {
-    p7:'Aviso 7d enviado', p5:'Aviso 5d enviado', p3:'Aviso 3d enviado',
-    p0:'Aviso venc. enviado', m7:'Mora 7d enviado', m14:'Mora 14d enviado',
-    m21:'Mora 21d enviado', m28:'Mora 28d+ enviado'
+    p10:'Aviso 10d enviado', p5:'Aviso 5d enviado',
+    p0:'Cobro venc. enviado', m7:'Mora 7d enviado', m45:'Mora 45d+ enviado'
   };
   const nuevoEstado = estadoMap[plantilla.id];
   if(nuevoEstado){
