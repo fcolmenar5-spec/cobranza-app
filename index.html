@@ -381,7 +381,7 @@ tbody td{padding:10px 14px;vertical-align:middle}
       <div class="section-header"><h2>Plantillas de Mensajes</h2>
         <button class="btn btn-primary" onclick="savePlantillas()">💾 Guardar cambios</button>
       </div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:18px">Variables disponibles: <code>{CLIENTE}</code> <code>{FAC}</code> <code>{MONTO}</code> <code>{FECHA_VENC}</code></p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:18px">Variables disponibles: <code>{CLIENTE}</code> <code>{FAC}</code> <code>{MONTO}</code> <code>{FECHA_VENC}</code> <code>{DIAS}</code> <code>{DIAS_MORA}</code></p>
       <div id="plantillas-container"></div>
     </div>
 
@@ -694,21 +694,21 @@ function initData(){
 function defaultPlantillas(){
   return [
     {id:'p7',tipo:'⏰ Recordatorio 7 días',dias:7,mora:false,
-     msg:'Estimado/a {CLIENTE}, le recordamos que la factura N° {FAC} por {MONTO} vence el {FECHA_VENC} (en 7 días). Por favor planifique su pago. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, le recordamos que la factura N° {FAC} por {MONTO} vence el {FECHA_VENC} (en {DIAS} días). Por favor planifique su pago. — FEBECA'},
     {id:'p5',tipo:'⏰ Recordatorio 5 días',dias:5,mora:false,
-     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} vence en 5 días, el {FECHA_VENC}. Le agradecemos gestionar el pago. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} vence en {DIAS} días, el {FECHA_VENC}. Le agradecemos gestionar el pago. — FEBECA'},
     {id:'p3',tipo:'⚠️ Recordatorio 3 días',dias:3,mora:false,
-     msg:'Estimado/a {CLIENTE}, AVISO: la factura N° {FAC} por {MONTO} vence en 3 días ({FECHA_VENC}). Realice su pago para evitar recargos. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, AVISO: la factura N° {FAC} por {MONTO} vence en {DIAS} días ({FECHA_VENC}). Realice su pago para evitar recargos. — FEBECA'},
     {id:'p0',tipo:'🔴 Último día de vencimiento',dias:0,mora:false,
      msg:'Estimado/a {CLIENTE}, HOY VENCE la factura N° {FAC} por {MONTO}. Realice el pago hoy para evitar intereses de mora. — FEBECA'},
     {id:'m7',tipo:'🔴 Mora +7 días',dias:7,mora:true,
-     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} venció el {FECHA_VENC} y tiene 7 días de mora. Regularice su pago a la brevedad. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} venció el {FECHA_VENC} y tiene {DIAS_MORA} días de mora. Regularice su pago a la brevedad. — FEBECA'},
     {id:'m14',tipo:'🔴 Mora +14 días',dias:14,mora:true,
-     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} acumula 14 días de mora (venció el {FECHA_VENC}). Comuníquese con su vendedor para acordar pago. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, la factura N° {FAC} por {MONTO} acumula {DIAS_MORA} días de mora (venció el {FECHA_VENC}). Comuníquese con su vendedor para acordar pago. — FEBECA'},
     {id:'m21',tipo:'⚠️ Mora +21 días',dias:21,mora:true,
-     msg:'Estimado/a {CLIENTE}, AVISO URGENTE: la factura N° {FAC} por {MONTO} lleva 21 días vencida ({FECHA_VENC}). Contáctenos HOY. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, AVISO URGENTE: la factura N° {FAC} por {MONTO} lleva {DIAS_MORA} días vencida ({FECHA_VENC}). Contáctenos HOY. — FEBECA'},
     {id:'m28',tipo:'🚨 Mora +28 días',dias:28,mora:true,
-     msg:'Estimado/a {CLIENTE}, ÚLTIMO AVISO: la factura N° {FAC} por {MONTO} lleva más de 28 días vencida desde el {FECHA_VENC}. Procederemos con cobranza formal. — FEBECA'},
+     msg:'Estimado/a {CLIENTE}, ÚLTIMO AVISO: la factura N° {FAC} por {MONTO} lleva {DIAS_MORA} días vencida desde el {FECHA_VENC}. Procederemos con cobranza formal. — FEBECA'},
   ];
 }
 
@@ -749,11 +749,16 @@ function estadoBadge(e){
 
 function buildMsg(plantilla, fac, cliente){
   const venc = vencimiento(fac);
+  const dias = diffDays(venc);
+  const diasRestantes = dias > 0 ? dias : 0;
+  const diasMora = dias < 0 ? Math.abs(dias) : 0;
   return plantilla.msg
     .replace(/{CLIENTE}/g, cliente.nombre)
     .replace(/{FAC}/g, fac.num)
     .replace(/{MONTO}/g, fmtMoney(fac.monto))
-    .replace(/{FECHA_VENC}/g, fmtDate(venc));
+    .replace(/{FECHA_VENC}/g, fmtDate(venc))
+    .replace(/{DIAS}/g, diasRestantes)
+    .replace(/{DIAS_MORA}/g, diasMora);
 }
 
 function limpiarWa(raw){
